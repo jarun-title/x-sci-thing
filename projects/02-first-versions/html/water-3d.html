@@ -1,0 +1,293 @@
+<title>Glass to Steam 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 3D stage with DOM HUD overlay, transport underneath. Single dark look by choice. */
+:root {
+  --bg: #070b12; --panel: #0e1520; --line: #1d2a3a; --fg: #e4ecf3; --muted: #8193a6;
+  --water: #5fb8e6; --heat: #ff9a3c;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--display); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 40px; display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--water); }
+h1 { margin: 4px 0 0; font-size: clamp(24px, 4vw, 36px); letter-spacing: -.02em; text-wrap: balance; }
+.stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #03060b; border: 1px solid var(--line); }
+.stage canvas { display: block; width: 100% !important; height: 100% !important; }
+#veil { position: absolute; inset: 0; pointer-events: none; }
+#scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, rgba(2,5,10,.7), rgba(2,5,10,0) 38%), linear-gradient(to bottom, rgba(2,5,10,.45), rgba(2,5,10,0) 22%); }
+.hud { position: absolute; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+.cap { left: 4%; bottom: 7%; }
+.cap .n { font-family: var(--mono); font-size: clamp(9px, 1.1vw, 13px); color: var(--water); }
+.cap .t { font-weight: 700; font-size: clamp(16px, 3vw, 36px); }
+.cap .s { font-size: clamp(10px, 1.5vw, 17px); color: rgba(228,236,243,.78); }
+.temp { right: 4%; top: 6%; text-align: right; }
+.temp .l { font-family: var(--mono); font-size: clamp(8px, 1vw, 12px); color: rgba(228,236,243,.6); letter-spacing: .08em; }
+.temp .v { font-weight: 700; font-size: clamp(16px, 2.8vw, 32px); font-variant-numeric: tabular-nums; }
+.scale { right: 4%; bottom: 7%; font-family: var(--mono); font-size: clamp(9px, 1.1vw, 13px); color: rgba(228,236,243,.85); }
+.transport { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+button { font: inherit; font-size: 14px; font-weight: 600; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--water); outline-offset: 2px; }
+#play { min-width: 92px; background: var(--water); color: #04121d; border-color: var(--water); }
+input[type=range] { flex: 1 1 200px; min-width: 0; accent-color: var(--water); }
+.time { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.note { font-size: 13px; color: var(--muted); max-width: 68ch; line-height: 1.55; margin: 0; }
+#err { color: var(--heat); font-family: var(--mono); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <div>
+    <div class="eyebrow">Three.js · real-time 3D</div>
+    <h1>From a glass of water to steam, in 3D</h1>
+  </div>
+  <div class="stage" id="stage">
+    <div id="veil"></div>
+    <div id="scrim"></div>
+    <div class="hud cap"><div class="n" id="capN">01 / 09</div><div class="t" id="capT">A glass of water</div><div class="s" id="capS"></div></div>
+    <div class="hud temp"><div class="l">TEMPERATURE</div><div class="v" id="tempV">20 °C</div></div>
+    <div class="hud scale" id="scaleV">≈ 8 cm</div>
+  </div>
+  <div class="transport">
+    <button id="play" type="button">Pause</button>
+    <button id="replay" type="button">Replay</button>
+    <input id="scrub" type="range" min="0" max="32" step="0.01" value="0" aria-label="Timeline">
+    <span class="time" id="time">0.0 / 32.0 s</span>
+  </div>
+  <p class="note">Every frame is rendered live by the GPU: about 730 molecules as instanced meshes, an electron cloud of 4,000 points, and a glass lit by real-time lights. Drag the timeline to scrub.</p>
+  <p id="err" hidden></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+if (!window.THREE) { const e = document.getElementById('err'); e.hidden = false; e.textContent = 'Three.js did not load, so the 3D scene cannot start.'; return; }
+const T_END = 32;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const lerp = (a, b, k) => a + (b - a) * k;
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const R = rng(11);
+const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+
+const CH = [[0,'A glass of water','About 250 mL at room temperature','≈ 8 cm'],[4,'Zooming in','Roughly 100 million times closer','≈ 1 cm → 1 nm'],[8,'Water molecules','H₂O · oxygen red, hydrogen white','≈ 1 nm'],[12,'Into one molecule','Heading for the oxygen atom','≈ 300 pm'],[15,'An oxygen atom','8 protons · 8 neutrons · 8 electrons','≈ 100 pm'],[18,'Back to the molecules','Heat is being added','≈ 1 nm'],[20,'Heating up','More energy means faster motion','≈ 1 nm'],[24,'Bonds break','Molecules escape as water vapor','≈ 3 nm'],[27,'Steam','Liquid becomes gas at 100 °C','≈ 8 cm']];
+const heatAt = t => ease(seg(t, 15.5, 25));
+const vapAt = t => seg(t, 24, 29.5);
+const DT = .01, TAU = new Float32Array(Math.ceil(T_END / DT) + 2);
+for (let i = 1; i < TAU.length; i++) TAU[i] = TAU[i - 1] + DT * (1 + 3.2 * heatAt(i * DT));
+const tauAt = t => { const k = clamp(t, 0, T_END) / DT, i = Math.floor(k); return lerp(TAU[i], TAU[i + 1] || TAU[i], k - i); };
+
+// ---------- renderer ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(42, 16 / 9, .01, 400);
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage); resize();
+
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x101820, .45));
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(5, 9, 6); scene.add(key);
+const rim = new THREE.DirectionalLight(0x5fb8e6, .9); rim.position.set(-6, 3, -6); scene.add(rim);
+const heatLight = new THREE.PointLight(0xff8a30, 0, 60); heatLight.position.set(0, -8, 4); scene.add(heatLight);
+
+function softTex(r, g, b) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); }
+
+// ---------- A: glass ----------
+const glassG = new THREE.Group(); scene.add(glassG);
+const table = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: 0x06090f, roughness: .9, metalness: 0 }));
+table.rotation.x = -Math.PI / 2; glassG.add(table);
+const prof = [new THREE.Vector2(0, 0), new THREE.Vector2(1.55, 0), new THREE.Vector2(1.6, .05), new THREE.Vector2(2, 5), new THREE.Vector2(1.92, 5), new THREE.Vector2(1.52, .35), new THREE.Vector2(0, .35)];
+const glass = new THREE.Mesh(new THREE.LatheGeometry(prof, 96), new THREE.MeshPhysicalMaterial({ color: 0xdff2ff, transparent: true, opacity: .22, roughness: .02, metalness: 0, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false }));
+glassG.add(glass);
+const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x2f8fd0, transparent: true, opacity: .62, roughness: .05, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
+const water = new THREE.Mesh(new THREE.CylinderGeometry(1.86, 1.52, 1, 96, 1, false), waterMat);
+glassG.add(water);
+const surface = new THREE.Mesh(new THREE.CircleGeometry(1, 96), new THREE.MeshPhysicalMaterial({ color: 0x8fd3f5, transparent: true, opacity: .55, roughness: .05, clearcoat: 1, side: THREE.DoubleSide }));
+surface.rotation.x = -Math.PI / 2; glassG.add(surface);
+// steam + bubbles
+const NS = 160, steamGeo = new THREE.BufferGeometry(); steamGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NS * 3), 3));
+const steamMat = new THREE.PointsMaterial({ size: 1.6, map: softTex(235, 242, 248), transparent: true, opacity: 0, depthWrite: false });
+const steam = new THREE.Points(steamGeo, steamMat); glassG.add(steam);
+const NB = 60, bubGeo = new THREE.BufferGeometry(); bubGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NB * 3), 3));
+const bubMat = new THREE.PointsMaterial({ size: .14, map: softTex(230, 245, 255), transparent: true, opacity: 0, depthWrite: false });
+const bubbles = new THREE.Points(bubGeo, bubMat); glassG.add(bubbles);
+const SP = Array.from({ length: NS }, () => [R(), R(), R(), R()]);
+const BP = Array.from({ length: NB }, () => [R(), R(), R(), R()]);
+
+function updateGlass(t, h, steamI, drop) {
+  const top = 3.6 - drop * 1.6, bot = .35, hgt = top - bot;
+  water.scale.y = hgt; water.position.y = bot + hgt / 2;
+  const rAt = y => lerp(1.52, 1.92, (y - .35) / 4.65);
+  surface.position.y = top; const rs = rAt(top) - .02; surface.scale.set(rs, rs, 1);
+  surface.rotation.z = Math.sin(t * 2) * .02;
+  waterMat.color.setRGB(lerp(.18, .35, h), lerp(.56, .5, h), lerp(.82, .7, h));
+  const sp = steamGeo.attributes.position.array;
+  SP.forEach((p, i) => { const per = 3 + p[0] * 2, age = (t / per + p[1]) % 1; const a = p[2] * 6.28, r = p[3] * rs * .9 + age * 1.2;
+    sp[i * 3] = Math.cos(a + age) * r; sp[i * 3 + 1] = top + age * 6; sp[i * 3 + 2] = Math.sin(a + age) * r; });
+  steamGeo.attributes.position.needsUpdate = true; steamMat.opacity = steamI * .35; steamMat.size = 1.2 + steamI * .8;
+  const bp = bubGeo.attributes.position.array;
+  BP.forEach((p, i) => { const per = 1.2 + p[0] * 1.5, age = (t / per + p[1]) % 1; const y = lerp(bot + .05, top - .05, age), r = p[3] * rAt(y) * .85, a = p[2] * 6.28;
+    bp[i * 3] = Math.cos(a) * r + Math.sin(age * 9 + i) * .05; bp[i * 3 + 1] = y; bp[i * 3 + 2] = Math.sin(a) * r; });
+  bubGeo.attributes.position.needsUpdate = true; bubMat.opacity = clamp((h - .55) / .45) * .9;
+}
+
+// ---------- B: molecules ----------
+const molG = new THREE.Group(); scene.add(molG);
+const OHd = .96, HALF = 104.5 / 2 * Math.PI / 180, SPC = 3.2, NG = 3; // grid -4..4
+const MOL = [];
+for (let x = -NG; x <= NG; x++) for (let y = -NG; y <= NG; y++) for (let z = -NG; z <= NG; z++) {
+  const c = !x && !y && !z;
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(R() * 6.28, R() * 6.28, R() * 6.28));
+  if (c) q.setFromEuler(new THREE.Euler(0, 0, 0));
+  const dir = new THREE.Vector3(gauss() * .8, .6 + R() * 1.2, gauss() * .8);
+  MOL.push({ b: new THREE.Vector3(x * SPC + (c ? 0 : (R() - .5)), y * SPC + (c ? 0 : (R() - .5)), z * SPC + (c ? 0 : (R() - .5))), q, p: [R() * 7, R() * 7, R() * 7, R() * 7], fr: .7 + R() * .6, dir, spin: new THREE.Vector3(R() - .5, R() - .5, R() - .5).normalize(), c });
+}
+const N = MOL.length, CENTER = MOL.findIndex(m => m.c);
+const oMat = new THREE.MeshStandardMaterial({ color: 0xe2584a, roughness: .35, metalness: 0, emissive: 0x000000 });
+const hMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f7, roughness: .4, emissive: 0x000000 });
+const bMat = new THREE.MeshStandardMaterial({ color: 0xc9d3dd, roughness: .5 });
+const oI = new THREE.InstancedMesh(new THREE.SphereGeometry(.6, 24, 16), oMat, N);
+const hI = new THREE.InstancedMesh(new THREE.SphereGeometry(.34, 16, 12), hMat, N * 2);
+const bI = new THREE.InstancedMesh(new THREE.CylinderGeometry(.11, .11, 1, 10), bMat, N * 2);
+molG.add(oI, hI, bI);
+const H1 = new THREE.Vector3(Math.sin(HALF) * OHd, -Math.cos(HALF) * OHd, 0), H2 = new THREE.Vector3(-Math.sin(HALF) * OHd, -Math.cos(HALF) * OHd, 0);
+const M4 = new THREE.Matrix4(), V = new THREE.Vector3(), V2 = new THREE.Vector3(), Q = new THREE.Quaternion(), Q2 = new THREE.Quaternion(), S1 = new THREE.Vector3(1, 1, 1), UP = new THREE.Vector3(0, 1, 0);
+const centerPos = new THREE.Vector3();
+function molPos(m, tau, h, v, out) {
+  const amp = .08 + .55 * h, Vd = 22 * Math.pow(v, 1.8);
+  out.set(m.b.x + amp * Math.sin(tau * 1.7 * m.fr + m.p[0]), m.b.y + amp * Math.cos(tau * 1.3 * m.fr + m.p[1]), m.b.z + amp * Math.sin(tau * 1.5 * m.fr + m.p[2]));
+  out.addScaledVector(m.dir, Vd); return out;
+}
+function updateMolecules(t, h, v, cam) {
+  const tau = tauAt(t);
+  molPos(MOL[CENTER], tau, h, 0, centerPos);
+  MOL.forEach((m, i) => {
+    molPos(m, tau, h, v, V);
+    Q2.setFromAxisAngle(m.spin, (.12 + .7 * h) * Math.sin(tau * 1.1 * m.fr + m.p[3]) + v * v * 14);
+    Q.copy(m.q).multiply(Q2);
+    const sc = m.c ? 1 : clamp((V.distanceTo(cam) - 1.6) / 1.2);
+    S1.setScalar(sc);
+    M4.compose(V, Q, S1); oI.setMatrixAt(i, M4);
+    [H1, H2].forEach((hv, k) => {
+      V2.copy(hv).applyQuaternion(Q).add(V);
+      M4.compose(V2, Q, S1); hI.setMatrixAt(i * 2 + k, M4);
+      const mid = V2.clone().add(V).multiplyScalar(.5), d = V2.clone().sub(V);
+      const bq = new THREE.Quaternion().setFromUnitVectors(UP, d.normalize());
+      M4.compose(mid, bq, new THREE.Vector3(sc, OHd * sc, sc)); bI.setMatrixAt(i * 2 + k, M4);
+    });
+  });
+  S1.setScalar(1);
+  oI.instanceMatrix.needsUpdate = hI.instanceMatrix.needsUpdate = bI.instanceMatrix.needsUpdate = true;
+  oMat.color.setRGB(lerp(.89, 1, h), lerp(.35, .48, h), lerp(.29, .2, h));
+  oMat.emissive.setRGB(.5 * h, .16 * h, 0); hMat.emissive.setRGB(.35 * h, .14 * h, .02 * h);
+}
+
+// ---------- C: atom ----------
+const atomG = new THREE.Group(); scene.add(atomG);
+const cloudPts = [];
+const push = (x, y, z, k) => cloudPts.push(x, y, z, k);
+for (let i = 0; i < 700; i++) push(gauss() * .28, gauss() * .28, gauss() * .28, 0);
+for (let i = 0; i < 1300; i++) { const r = 1.15 + gauss() * .22, u = R() * 2 - 1, th = R() * 6.28, s = Math.sqrt(1 - u * u); push(r * s * Math.cos(th), r * u, r * s * Math.sin(th), 1); }
+for (let ax = 0; ax < 3; ax++) for (let i = 0; i < 700; i++) { const d = (.9 + gauss() * .26) * (R() < .5 ? -1 : 1), w1 = gauss() * (.18 + Math.abs(d) * .22), w2 = gauss() * (.18 + Math.abs(d) * .22);
+  const p = [w1, w2, w1]; p[ax] = d; p[(ax + 1) % 3] = w1; p[(ax + 2) % 3] = w2; push(p[0], p[1], p[2], 2); }
+const NC = cloudPts.length / 4, cBase = new Float32Array(NC * 3), cPos = new Float32Array(NC * 3), cCol = new Float32Array(NC * 3), cSeed = new Float32Array(NC);
+for (let i = 0; i < NC; i++) { cBase[i * 3] = cloudPts[i * 4]; cBase[i * 3 + 1] = cloudPts[i * 4 + 1]; cBase[i * 3 + 2] = cloudPts[i * 4 + 2]; cSeed[i] = R() * 100; }
+const KCOL = [[.75, .93, 1], [.47, .78, .96], [.43, .63, 1]];
+const cloudGeo = new THREE.BufferGeometry();
+cloudGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3)); cloudGeo.setAttribute('color', new THREE.BufferAttribute(cCol, 3));
+const cloud = new THREE.Points(cloudGeo, new THREE.PointsMaterial({ size: .1, vertexColors: true, map: softTex(255, 255, 255), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+atomG.add(cloud);
+const nucG = new THREE.Group(); atomG.add(nucG);
+const pMat = new THREE.MeshStandardMaterial({ color: 0xe2584a, roughness: .35 }), nMat = new THREE.MeshStandardMaterial({ color: 0x9aa6b2, roughness: .4 });
+for (let i = 0; i < 16; i++) { const phi = Math.acos(1 - 2 * (i + .5) / 16), th = Math.PI * (1 + Math.sqrt(5)) * i, r = i < 4 ? .05 : .11;
+  const s = new THREE.Mesh(new THREE.SphereGeometry(.075, 16, 12), i % 2 ? nMat : pMat); s.position.set(r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); nucG.add(s); }
+const nucGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex(255, 190, 150), transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false }));
+nucGlow.scale.set(.9, .9, 1); atomG.add(nucGlow);
+function updateAtom(t, h) {
+  const jit = .02 + .08 * h, ex = 1 + .12 * h;
+  for (let i = 0; i < NC; i++) { const s = cSeed[i], k = cloudPts[i * 4 + 3];
+    cPos[i * 3] = cBase[i * 3] * ex + Math.sin(s * 9 + t * 9) * jit; cPos[i * 3 + 1] = cBase[i * 3 + 1] * ex + Math.cos(s * 7 + t * 8) * jit; cPos[i * 3 + 2] = cBase[i * 3 + 2] * ex + Math.sin(s * 5 + t * 7) * jit;
+    const f = .35 + .65 * Math.abs(Math.sin(s * 50 + t * (5 + 10 * h))), c = KCOL[k];
+    cCol[i * 3] = lerp(c[0], 1, h * .7) * f; cCol[i * 3 + 1] = lerp(c[1], .65, h * .7) * f; cCol[i * 3 + 2] = lerp(c[2], .3, h * .7) * f; }
+  cloudGeo.attributes.position.needsUpdate = cloudGeo.attributes.color.needsUpdate = true;
+  atomG.rotation.y = t * .25; atomG.rotation.x = .3;
+  nucG.position.set(Math.sin(t * 31) * .008 * h, Math.cos(t * 27) * .008 * h, 0);
+}
+
+// ---------- veil (crossfades) ----------
+const veil = document.getElementById('veil');
+const tri = (t, c, w) => 1 - clamp(Math.abs(t - c) / w);
+
+// ---------- frame ----------
+const capN = document.getElementById('capN'), capT = document.getElementById('capT'), capS = document.getElementById('capS');
+const tempV = document.getElementById('tempV'), scaleV = document.getElementById('scaleV');
+const bgCol = new THREE.Color();
+function render(t) {
+  const h = heatAt(t), v = vapAt(t), temp = 20 + 80 * h;
+  const view = t < 7.6 || t >= 28 ? 'glass' : (t >= 14.6 && t < 18.8 ? 'atom' : 'mol');
+  glassG.visible = view === 'glass'; molG.visible = view === 'mol'; atomG.visible = view === 'atom';
+  heatLight.intensity = 3 * h;
+
+  if (view === 'glass') {
+    const final = t >= 28;
+    updateGlass(t, h, final ? ease(seg(t, 27.5, 30)) : 0, final ? .3 : 0);
+    if (!final) { const k = ease(seg(t, 4, 7.6)), a = .5 + t * .07, r = 13;
+      const o = new THREE.Vector3(Math.sin(a) * r, 6, Math.cos(a) * r), into = new THREE.Vector3(0, 1.8, .6);
+      camera.position.lerpVectors(o, into, k); camera.lookAt(lerp(0, 0, k), lerp(2.2, 1.6, k), 0); }
+    else { const k = ease(seg(t, 28, 31)), a = .9 + t * .04;
+      const close = new THREE.Vector3(.2, 5.6, 1.2), far = new THREE.Vector3(Math.sin(a) * 14, 7.5, Math.cos(a) * 14);
+      camera.position.lerpVectors(close, far, k); camera.lookAt(0, lerp(4, 3, k), 0); }
+    bgCol.setRGB(.02, .035, .06);
+  } else if (view === 'mol') {
+    molPos(MOL[CENTER], tauAt(t), h, 0, centerPos);
+    let r;
+    if (t < 12) r = lerp(30, 22, ease(seg(t, 7.6, 12)));
+    else if (t < 15) r = lerp(22, 1.25, ease(seg(t, 12, 14.6)));
+    else if (t < 24) r = lerp(1.25, 20, ease(seg(t, 18.8, 20.2)));
+    else r = lerp(20, 40, ease(seg(t, 24, 28)));
+    const a = .4 + t * .09, el = .35;
+    camera.position.set(centerPos.x + Math.sin(a) * Math.cos(el) * r, centerPos.y + Math.sin(el) * r, centerPos.z + Math.cos(a) * Math.cos(el) * r);
+    camera.lookAt(centerPos);
+    updateMolecules(t, h, v, camera.position);
+    bgCol.setRGB(lerp(lerp(.04, .03, v), .1, h * .4 * (1 - v)), lerp(.16, .04, v), lerp(.28, .07, v));
+  } else {
+    updateAtom(t, h);
+    const r = t < 18 ? lerp(1.6, 3.4, ease(seg(t, 14.6, 16.2))) : lerp(3.4, 14, ease(seg(t, 18, 18.8)));
+    camera.position.set(0, .6, r); camera.lookAt(0, 0, 0);
+    bgCol.setRGB(.012 + .06 * h, .02 + .02 * h, .04);
+  }
+  scene.fog = view === 'mol' ? new THREE.Fog(bgCol, 14, 46) : null;
+  renderer.setClearColor(bgCol);
+  renderer.render(scene, camera);
+
+  const blue = tri(t, 7.6, .9), white = tri(t, 14.6, .6), dark = Math.max(tri(t, 18.8, .5), tri(t, 28, .9));
+  veil.style.background = blue > white && blue > dark ? `rgba(31,106,156,${blue})` : white > dark ? `rgba(220,240,255,${white})` : `rgba(3,6,11,${dark})`;
+
+  let ci = 0; CH.forEach((c, i) => { if (t >= c[0]) ci = i; });
+  capN.textContent = String(ci + 1).padStart(2, '0') + ' / 09'; capT.textContent = CH[ci][1]; capS.textContent = CH[ci][2]; scaleV.textContent = 'scale ' + CH[ci][3];
+  const hot = h; tempV.textContent = Math.round(temp) + ' °C' + (temp >= 99.5 ? ' · boiling' : '');
+  tempV.style.color = `rgb(${lerp(95, 255, hot) | 0},${lerp(184, 154, hot) | 0},${lerp(230, 60, hot) | 0})`;
+}
+
+// ---------- playback ----------
+const playBtn = document.getElementById('play'), scrub = document.getElementById('scrub'), timeEl = document.getElementById('time');
+let T = 0, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, last = null;
+if (!playing) T = 9.5;
+function frame() { render(T); scrub.value = T; timeEl.textContent = `${T.toFixed(1)} / 32.0 s`; playBtn.textContent = playing ? 'Pause' : (T >= T_END ? 'Play again' : 'Play'); }
+function loop(now) { if (playing) { if (last != null) T += Math.min(.05, (now - last) / 1000); last = now; if (T >= T_END) { T = T_END; playing = false; } frame(); } else last = null; requestAnimationFrame(loop); }
+playBtn.onclick = () => { if (T >= T_END) T = 0; playing = !playing; frame(); };
+document.getElementById('replay').onclick = () => { T = 0; playing = true; frame(); };
+scrub.oninput = () => { T = +scrub.value; frame(); };
+window.__seek = t => { T = t; playing = false; frame(); };
+frame(); requestAnimationFrame(loop);
+})();
+</script>

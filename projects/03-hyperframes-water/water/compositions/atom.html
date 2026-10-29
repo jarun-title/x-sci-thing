@@ -1,0 +1,63 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #05080f; overflow: hidden; }
+    #a-halo { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(63,159,214,0.28) 0%, rgba(5,8,15,0) 38%); }
+    #a-heat { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(255,128,48,0.42) 0%, rgba(120,40,10,0.25) 40%, rgba(5,8,15,0) 75%); opacity: 0; }
+    #a-canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; transform-origin: 960px 540px; }
+    .a-title { position: absolute; left: 144px; top: 120px; font-size: 76px; font-weight: 900; letter-spacing: -0.03em; }
+    .a-title span { display: inline-block; margin-right: 0.22em; }
+    .a-label { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 34px; line-height: 1.35; white-space: nowrap; }
+    .a-label small { display: block; font-size: 26px; color: #8193a6; }
+    #a-lines { position: absolute; inset: 0; }
+    #a-temp { position: absolute; right: 144px; top: 120px; text-align: right; }
+    #a-temp .k { font-family: "JetBrains Mono", monospace; font-size: 24px; color: #8193a6; letter-spacing: 0.14em; }
+    #a-temp .v { font-size: 88px; font-weight: 900; letter-spacing: -0.03em; color: #ffb070; font-variant-numeric: tabular-nums; }
+  </style>
+  <div id="root" data-composition-id="atom" data-width="1920" data-height="1080">
+    <div id="a-halo"></div>
+    <div id="a-heat"></div>
+    <canvas id="a-canvas" width="1920" height="1080"></canvas>
+    <h1 class="a-title" id="a-title"><span>One</span><span>oxygen</span><span>atom.</span></h1>
+    <svg id="a-lines" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <path id="a-l1" d="M1120 360 L1300 260" fill="none" stroke="#9fd6f2" stroke-width="2" />
+      <path id="a-l2" d="M935 565 L700 760" fill="none" stroke="#ffb3a6" stroke-width="2" />
+    </svg>
+    <div class="a-label" id="a-cloud" style="left:1316px; top:212px; color:#9fd6f2">electron cloud<small>where its 8 electrons are likely to be</small></div>
+    <div class="a-label" id="a-nuc" style="left:330px; top:774px; color:#ffb3a6">nucleus · 8 protons + 8 neutrons<small>drawn ~2,000× too big to be visible</small></div>
+    <div id="a-temp"><div class="k">TEMPERATURE</div><div class="v" id="a-tv">20 °C</div></div>
+  </div>
+  <script>
+    (() => {
+      const cv = document.getElementById("a-canvas"), ctx = cv.getContext("2d");
+      const { drawAtom, clamp } = window.H2O;
+      const heatAt = t => 0.25 * clamp((t - 2.9) / 2.1);
+      const scaleAt = t => 1.05 + 0.45 * (1 - Math.pow(1 - clamp(t / 1.4), 4));
+      const tv = document.getElementById("a-tv");
+      function render(t) {
+        const h = heatAt(t);
+        drawAtom(ctx, 1920, 1080, { t, heat: h, scale: scaleAt(t) });
+        tv.textContent = Math.round(20 + 80 * h) + " °C";
+      }
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: 5, duration: 5, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      tl.set("#a-canvas", { opacity: 0, filter: "blur(12px)", scale: 1 }, 0);
+      tl.to("#a-canvas", { opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 0);
+      // per word from grey to ink
+      tl.fromTo("#a-title span", { opacity: 1, color: "#3a4656" }, { color: "#e8eef4", duration: 0.2, stagger: 0.09, ease: "power2.out" }, 0.5);
+      tl.fromTo("#a-l1", { strokeDasharray: 260, strokeDashoffset: 260 }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, 1.2);
+      tl.fromTo("#a-cloud", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.45);
+      tl.fromTo("#a-l2", { strokeDasharray: 320, strokeDashoffset: 320 }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, 1.7);
+      tl.fromTo("#a-nuc", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.95);
+      tl.to(["#a-title", "#a-l1", "#a-l2", "#a-cloud", "#a-nuc"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power2.in" }, 3.9);
+      // heat arrives: colour flood behind the atom
+      tl.fromTo("#a-temp", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 2.9);
+      tl.fromTo("#a-heat", { opacity: 0 }, { opacity: 1, duration: 1.6, ease: "power2.inOut" }, 3.0);
+      // pull back out: the atom shrinks back into a molecule
+      tl.to("#a-canvas", { scale: 0.12, duration: 0.55, ease: "power3.in" }, 4.4);
+      tl.to("#a-canvas", { opacity: 0, duration: 0.2, ease: "power2.in" }, 4.75);
+      render(0);
+      window.__timelines["atom"] = tl;
+    })();
+  </script>
+</template>

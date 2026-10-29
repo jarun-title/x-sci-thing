@@ -1,0 +1,144 @@
+(() => {
+  const err = document.getElementById('err');
+  if (!window.Tone) { err.hidden = false; err.textContent = 'Tone.js did not load, so the audio cannot start. Reload the page to try again.'; return; }
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // ---------- shared output + scope ----------
+  const master = new Tone.Gain(0.8).toDestination();
+  const analyser = new Tone.Analyser('waveform', 1024);
+  master.connect(analyser);
+  const scope = document.getElementById('scope'), sctx = scope.getContext('2d');
+  function drawScope() {
+    const v = analyser.getValue(), W = scope.width, H = scope.height;
+    sctx.clearRect(0, 0, W, H);
+    sctx.strokeStyle = css('--scope'); sctx.lineWidth = 3; sctx.beginPath();
+    for (let i = 0; i < v.length; i++) { const x = i / (v.length - 1) * W, y = H / 2 - v[i] * H * 0.45; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+    sctx.stroke(); requestAnimationFrame(drawScope);
+  }
+  drawScope();
+
+  // ---------- the track ----------
+  let built = false, playing = false, parts = [];
+  let pad, pluck, bass, hat, bubbleSynth, padFilter, reverb;
+  const BARS = 20;
+  const chords = [
+    ['D3', 'F3', 'A3', 'E4'], ['Bb2', 'D3', 'F3', 'A3'], ['G2', 'Bb2', 'D3', 'F3'], ['A2', 'C#3', 'E3', 'G3'],
+    ['D3', 'F3', 'A3', 'E4'], ['Bb2', 'D3', 'F3', 'A3'], ['G2', 'Bb2', 'D3', 'F3'], ['A2', 'C#3', 'E3', 'G3'],
+    ['C3', 'E3', 'G3', 'D4'], ['Bb2', 'D3', 'F3', 'C4'], ['G2', 'Bb2', 'D3', 'F3'], ['A2', 'C#3', 'E3', 'G3'],
+    ['D3', 'F#3', 'A3', 'E4'], ['F#2', 'A2', 'C#3', 'E3'], ['G2', 'B2', 'D3', 'F#3'], ['A2', 'C#3', 'E3', 'G3'],
+    ['D3', 'F#3', 'A3', 'E4'], ['D3', 'F#3', 'A3', 'E4'], ['G2', 'B2', 'D3', 'F#3'], ['D3', 'F#3', 'A3', 'D4'],
+  ];
+  function build() {
+    reverb = new Tone.Reverb({ decay: 5, wet: 0.35 }).connect(master);
+    padFilter = new Tone.Filter(700, 'lowpass').connect(reverb);
+    pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'fatsawtooth', count: 3, spread: 18 }, envelope: { attack: 1.2, decay: 0.3, sustain: 0.7, release: 2.5 }, volume: -20 }).connect(padFilter);
+    const delay = new Tone.FeedbackDelay('8n.', 0.3).connect(reverb);
+    pluck = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.3, sustain: 0, release: 0.4 }, volume: -16 }).connect(delay);
+    bass = new Tone.MonoSynth({ oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.4, sustain: 0.5, release: 0.8 }, volume: -12 }).connect(master);
+    hat = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0 }, volume: -30 }).connect(new Tone.Filter(7000, 'highpass').connect(master));
+    // a bubble: a short sine whose pitch rises as it pops (same physics as the video's boil sound)
+    bubbleSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 }, volume: -18 }).connect(reverb);
+    built = true;
+  }
+
+  const secEls = [...document.querySelectorAll('.sec')];
+  const status = document.getElementById('status');
+  const playBtn = document.getElementById('play');
+  const sectionAt = bar => bar < 4 ? 0 : bar < 8 ? 1 : bar < 12 ? 2 : bar < 16 ? 3 : 4;
+
+  function schedule() {
+    const T = Tone.Transport;
+    T.cancel(); T.bpm.value = 84; T.position = 0;
+    // chords + bass, one per bar
+    parts.push(new Tone.Part((time, { bar }) => {
+      const ch = chords[bar];
+      pad.triggerAttackRelease(ch, '1m', time, 0.7);
+      bass.triggerAttackRelease(Tone.Frequency(ch[0]).transpose(-12), bar >= 16 ? '1m' : '2n', time, 0.8);
+      Tone.Draw.schedule(() => {
+        const s = sectionAt(bar); secEls.forEach((e, i) => e.classList.toggle('on', i === s));
+        status.textContent = `Bar ${bar + 1} of ${BARS} · ${Math.round(T.bpm.value)} bpm`;
+      }, time);
+    }, chords.map((_, bar) => [`${bar}:0`, { bar }])).start(0));
+    // arpeggio from bar 4 through 15
+    const arp = [];
+    for (let bar = 4; bar < 16; bar++) for (let s = 0; s < 8; s++) arp.push([`${bar}:${Math.floor(s / 2)}:${(s % 2) * 2}`, { bar, s }]);
+    parts.push(new Tone.Part((time, { bar, s }) => {
+      const ch = chords[bar], n = Tone.Frequency(ch[[0, 1, 2, 3, 2, 1, 3, 2][s]]).transpose(12);
+      pluck.triggerAttackRelease(n, '16n', time, bar >= 12 ? 0.9 : 0.55);
+    }, arp).start(0));
+    // hats once it heats
+    const hats = [];
+    for (let bar = 8; bar < 16; bar++) for (let s = 0; s < 8; s++) hats.push([`${bar}:${Math.floor(s / 2)}:${(s % 2) * 2}`, { bar, s }]);
+    parts.push(new Tone.Part((time, { bar, s }) => { if (bar >= 12 || s % 2 === 1) hat.triggerAttackRelease('32n', time, s % 2 ? 0.9 : 0.5); }, hats).start(0));
+    // bubbles: density follows the heat
+    parts.push(new Tone.Loop(time => {
+      const bar = Math.floor(Tone.Transport.ticks / Tone.Transport.PPQ / 4);
+      const p = bar < 8 ? 0 : bar < 12 ? 0.15 + (bar - 8) * 0.12 : bar < 16 ? 0.95 : Math.max(0, 0.95 - (bar - 16) * 0.25);
+      for (let k = 0; k < 3; k++) if (Math.random() < p) {
+        const f = 500 + Math.random() * 1800, t = time + Math.random() * 0.06;
+        bubbleSynth.triggerAttackRelease(f, 0.05, t, 0.3 + Math.random() * 0.5);
+        bubbleSynth.set({ detune: 0 });
+      }
+    }, '16n').start('8:0'));
+    // tempo and filter rise with the heat, then settle
+    T.scheduleOnce(t => { T.bpm.rampTo(112, Tone.Time('4m').toSeconds()); padFilter.frequency.rampTo(2600, Tone.Time('4m').toSeconds(), t); }, '8:0');
+    T.scheduleOnce(t => { padFilter.frequency.rampTo(1400, Tone.Time('4m').toSeconds(), t); }, '16:0');
+    T.scheduleOnce(t => { master.gain.rampTo(0, 3, t); }, '19:0');
+    T.scheduleOnce(() => Tone.Draw.schedule(stopTrack, Tone.now() + 3.2), '19:0');
+  }
+
+  function stopTrack() {
+    Tone.Transport.stop(); Tone.Transport.cancel();
+    parts.forEach(p => p.dispose()); parts = [];
+    if (pad) pad.releaseAll();
+    master.gain.cancelScheduledValues(Tone.now()); master.gain.value = 0.8;
+    padFilter && padFilter.frequency.cancelScheduledValues(Tone.now()); padFilter && (padFilter.frequency.value = 700);
+    playing = false; playBtn.textContent = 'Play';
+    secEls.forEach(e => e.classList.remove('on'));
+    status.textContent = 'Stopped · tap Play to hear it again';
+  }
+
+  playBtn.addEventListener('click', async () => {
+    try {
+      await Tone.start();
+      if (playing) { stopTrack(); return; }
+      if (!built) { status.textContent = 'Preparing reverb…'; build(); await reverb.ready; }
+      schedule(); Tone.Transport.start('+0.1');
+      playing = true; playBtn.textContent = 'Stop';
+    } catch (e) { err.hidden = false; err.textContent = 'The browser blocked audio. Tap Play again; if it still fails, check the device is not muted.'; }
+  });
+
+  // ---------- formant voice ----------
+  const F = { a: [730, 1090, 2440], e: [530, 1840, 2480], i: [270, 2290, 3010], o: [570, 840, 2410], u: [300, 870, 2240] };
+  const GAINS = [1, 0.5, 0.25];
+  let voice = null;
+  function makeVoice() {
+    const out = new Tone.Gain(0).connect(master);
+    const filters = [0, 1, 2].map(k => { const f = new Tone.Filter({ type: 'bandpass', frequency: F.a[k], Q: 9 }); f.connect(new Tone.Gain(GAINS[k] * 2.2).connect(out)); return f; });
+    const vib = new Tone.Vibrato(5.5, 0.08);
+    const src = new Tone.Oscillator(130.8, 'sawtooth');
+    src.connect(vib); filters.forEach(f => vib.connect(f));
+    src.start();
+    return { out, filters, src };
+  }
+  function setVowel(v, glide = 0.12) {
+    if (!voice) voice = makeVoice();
+    voice.filters.forEach((f, k) => f.frequency.rampTo(F[v][k], glide));
+    voice.out.gain.rampTo(0.5, 0.08);
+    document.querySelectorAll('#vowels button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  }
+  function hush() {
+    if (!voice) return;
+    voice.out.gain.rampTo(0, 0.15);
+    document.querySelectorAll('#vowels button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  }
+  let singTimers = [];
+  document.querySelectorAll('#vowels button').forEach(b => b.addEventListener('click', async () => { await Tone.start(); singTimers.forEach(clearTimeout); setVowel(b.dataset.v); }));
+  document.getElementById('hush').addEventListener('click', () => { singTimers.forEach(clearTimeout); hush(); });
+  document.getElementById('sing').addEventListener('click', async () => {
+    await Tone.start(); singTimers.forEach(clearTimeout); singTimers = [];
+    const melody = [['a', 'D3'], ['e', 'F3'], ['i', 'A3'], ['o', 'G3'], ['u', 'D3']];
+    melody.forEach(([v, n], k) => singTimers.push(setTimeout(() => { setVowel(v, 0.15); voice.src.frequency.rampTo(Tone.Frequency(n).toFrequency(), 0.1); }, k * 650)));
+    singTimers.push(setTimeout(hush, melody.length * 650 + 200));
+  });
+})();

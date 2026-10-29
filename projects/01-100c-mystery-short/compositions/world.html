@@ -1,0 +1,156 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #0F4C75; overflow: hidden; }
+    #wd-cv { position: absolute; inset: 0; width: 1080px; height: 1920px; }
+    .wd-pos { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+    .wd-pos > div { position: absolute; left: -80px; top: -50px; width: 160px; height: 100px; line-height: 100px; text-align: center; white-space: nowrap; transform-origin: 50% 50%; }
+    .wd-atom { font-family: Inter; font-weight: 900; font-size: 84px; line-height: 1; }
+    .wd-d { font-family: Inter; font-weight: 900; font-size: 58px; line-height: 1; color: #FFFFFF; paint-order: stroke fill; -webkit-text-stroke: 9px #0B1620; }
+    .wd-lab { position: absolute; left: 0; top: 0; font-family: Inter; font-weight: 700; font-size: 42px; line-height: 1.15; white-space: nowrap; paint-order: stroke fill; -webkit-text-stroke: 8px #0B1620; color: #FFFFFF; }
+    #wd-lead, #wd-lead2 { position: absolute; inset: 0; }
+    #wd-panel { position: absolute; left: 230px; top: 196px; width: 620px; height: 240px; border-radius: 28px; background: #0E1A24; }
+    #wd-ptitle { position: absolute; left: 38px; top: 26px; font-family: Inter; font-weight: 700; font-size: 34px; color: #9FB0BD; }
+    #wd-temp { position: absolute; left: 0; width: 620px; top: 52px; text-align: center; font-family: "League Gothic"; font-size: 190px; line-height: 1; color: #F4F7FA; font-variant-numeric: tabular-nums; }
+    #wd-speed { position: absolute; left: 0; width: 1080px; top: 456px; text-align: center; font-family: Inter; font-weight: 700; font-size: 40px; color: #FFFFFF; paint-order: stroke fill; -webkit-text-stroke: 8px #0B1620; }
+    #wd-stuck { position: absolute; left: 0; width: 1080px; top: 456px; text-align: center; font-family: Inter; font-weight: 900; font-size: 44px; color: #FF7A2F; paint-order: stroke fill; -webkit-text-stroke: 8px #0B1620; }
+  </style>
+  <div id="root" data-composition-id="world" data-width="1080" data-height="1920">
+    <canvas id="wd-cv" width="1080" height="1920"></canvas>
+    <div class="wd-pos" id="wd-O"><div class="wd-atom" id="wd-O-i" style="color:#FFFFFF">O</div></div>
+    <div class="wd-pos" id="wd-H1"><div class="wd-atom" id="wd-H1-i" style="color:#24313B">H</div></div>
+    <div class="wd-pos" id="wd-H2"><div class="wd-atom" id="wd-H2-i" style="color:#24313B">H</div></div>
+    <div class="wd-pos" id="wd-dneg"><div class="wd-d" id="wd-dneg-i">δ−</div></div>
+    <div class="wd-pos" id="wd-dpos1"><div class="wd-d" id="wd-dpos1-i">δ+</div></div>
+    <div class="wd-pos" id="wd-dpos2"><div class="wd-d" id="wd-dpos2-i">δ+</div></div>
+    <div class="wd-pos" id="wd-n1"><div class="wd-d" id="wd-n1-i">δ−</div></div>
+    <div class="wd-pos" id="wd-n2"><div class="wd-d" id="wd-n2-i">δ−</div></div>
+    <div class="wd-pos" id="wd-n3"><div class="wd-d" id="wd-n3-i">δ+</div></div>
+    <div class="wd-pos" id="wd-n4"><div class="wd-d" id="wd-n4-i">δ+</div></div>
+    <svg id="wd-lead" width="1080" height="1920" viewBox="0 0 1080 1920"><path id="wd-lead-p" fill="none" stroke="#9ED3FF" stroke-width="4"/></svg>
+    <div class="wd-lab" id="wd-hblab" style="color:#9ED3FF">hydrogen bond</div>
+    <svg id="wd-lead2" width="1080" height="1920" viewBox="0 0 1080 1920"><path id="wd-lead2-p" fill="none" stroke="#0E1A24" stroke-width="4"/></svg>
+    <div class="wd-lab" id="wd-intact" style="color:#0E1A24; -webkit-text-stroke: 8px #E4EFF7">O–H bonds stay intact</div>
+    <div id="wd-panel"><div id="wd-ptitle">water temperature</div><div id="wd-temp">20.0 °C</div></div>
+    <div id="wd-speed">molecules' average speed +0%</div>
+    <div id="wd-stuck">heat still going in ↑</div>
+  </div>
+  <script>
+    (() => {
+      const W = window.Water2D, $ = id => document.getElementById(id);
+      const cv = $("wd-cv"), ctx = cv.getContext("2d");
+      const D = 30.401;
+      const clamp = W.clamp, lerp = W.lerp, smooth = W.smooth;
+      const io = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+      const eout = x => 1 - Math.pow(1 - x, 4);
+      const seg = (t, a, b) => clamp((t - a) / (b - a));
+      // narration marks (scene-local seconds)
+      const M = {"oxygen": 1.65, "hydrogens": 2.79, "sharing": 3.64, "electrons": 4.21, "pulls": 5.891, "harder": 7.401, "negative": 9.291, "positive": 11.821, "pull0": 12.745, "hb": 16.005, "attract": 13.695, "heat": 17.42, "hundred": 22.447, "stops": 24.097, "free0": 25.991, "snap": 26.811, "free": 28.781, "intact": 27.881};
+      // temperature: 20 °C until the heat line, then up to 100 °C right on "hundred"; it never goes higher
+      const Tat = t => 20 + 80 * io(seg(t, M.heat + 0.2, M.hundred));
+      // agitation clock: integrate how fast things jiggle, so speed-ups are smooth
+      const DT = 0.01, NS = Math.ceil(D / DT) + 2, TAU = new Float32Array(NS);
+      for (let i = 1; i < NS; i++) { const T = Tat(i * DT); TAU[i] = TAU[i - 1] + DT * (0.6 + 2.6 * clamp((T - 20) / 80)); }
+      const tauAt = t => { const k = clamp(t, 0, D) / DT, i = Math.floor(k); return TAU[i] + (TAU[Math.min(i + 1, NS - 1)] - TAU[i]) * (k - i); };
+      W.setRelease(M.snap, M.free + 0.9);
+      // camera: px per Å and the world point at the screen centre
+      function camAt(t) {
+        let s, cy;
+        const a = eout(seg(t, 0, 1.3));                       // fall in from the lens onto the hero molecule
+        s = 28 * Math.pow(230 / 28, a); cy = lerp(4.43, 0.87, a);
+        const b = io(seg(t, M.pull0, M.pull0 + 1.4));          // pull back to see the neighbours
+        s = s * Math.pow(72 / 230, b); cy = lerp(cy, 3.5, b);
+        const c = seg(t, M.heat, M.free0);                     // slow settle while it heats
+        s *= lerp(1, 66 / 72, c); cy = lerp(cy, 3.0, c);
+        const d = io(seg(t, M.free0 - 0.2, M.free0 + 1.0));   // tilt up to the surface
+        s *= lerp(1, 60 / 66, d); cy = lerp(cy, -4.5, d);
+        return { cx: 0, cy, s };
+      }
+      const els = ["wd-O", "wd-H1", "wd-H2", "wd-dneg", "wd-dpos1", "wd-dpos2", "wd-n1", "wd-n2", "wd-n3", "wd-n4", "wd-hblab", "wd-intact"].reduce((o, k) => (o[k] = $(k), o), {});
+      const SIZE = {};  // measured once, after the fonts are in
+      const measure = () => Object.keys(els).forEach(k => { SIZE[k] = [els[k].offsetWidth, els[k].offsetHeight]; });
+      const place = (el, x, y, ax = 0.5, ay = 0.5) => { const [w, h] = SIZE[el.id]; el.style.transform = `translate(${(x - w * ax).toFixed(1)}px, ${(y - h * ay).toFixed(1)}px)`; };
+      const tempEl = $("wd-temp"), speedEl = $("wd-speed"), leadP = $("wd-lead-p"), lead2P = $("wd-lead2-p");
+      function render(t) {
+        const cam = camAt(t), T = Tat(t);
+        const P = {
+          T, tau: tauAt(t), heroCalm: lerp(0.25, 1, seg(t, M.pull0, M.pull0 + 1.0)),
+          crowd: lerp(0.35, 1, seg(t, M.pull0, M.pull0 + 1.0)),
+          bondAlpha: smooth(seg(t, M.hb, M.hb + 0.5)), heroBondAlpha: 1,
+          cloud: smooth(seg(t, M.sharing - 0.3, M.sharing + 0.4)) * (1 - smooth(seg(t, M.pull0 - 0.4, M.pull0 + 0.1))),
+          pairs: smooth(seg(t, M.electrons - 0.25, M.electrons + 0.2)) * (1 - smooth(seg(t, M.pull0 - 0.4, M.pull0 + 0.1))),
+          pull: io(seg(t, M.pulls, M.harder + 0.3)),
+          heat: smooth(seg(t, M.heat, M.heat + 0.6)), flicker: seg(t, M.heat, M.heat + 1.0),
+          bondScale: lerp(1, 1.5, seg(t, M.pull0, M.pull0 + 1.4)),
+          tile: 1 - smooth(seg(t, 0.2, 0.75)), air: t > M.pull0, boil: seg(t, M.hundred - 0.5, M.free0),
+        };
+        ctx.clearRect(0, 0, 1080, 1920);
+        const poses = W.render(ctx, cam, t, P);
+        const h = poses[0], X = x => W.sx(cam, x), Y = y => W.sy(cam, y);
+        // atom letters sit on the atoms of the hero molecule
+        place(els["wd-O"], X(h.x), Y(h.y)); place(els["wd-H1"], X(h.h1[0]), Y(h.h1[1])); place(els["wd-H2"], X(h.h2[0]), Y(h.h2[1]));
+        // partial charges: δ− beyond O on the lone-pair side, δ+ beyond each H
+        const up = h.bis + Math.PI;
+        place(els["wd-dneg"], X(h.x + (W.RO + 0.5) * Math.cos(up)), Y(h.y + (W.RO + 0.5) * Math.sin(up)));
+        [[h.h1, "wd-dpos1"], [h.h2, "wd-dpos2"]].forEach(([q, id]) => {
+          const ux = q[0] - h.x, uy = q[1] - h.y, L = Math.hypot(ux, uy), r = W.RH + 0.42;
+          place(els[id], X(q[0] + ux / L * r), Y(q[1] + uy / L * r));
+        });
+        // opposite charges on the neighbours: the O atoms the hero's H point at (δ−), the H atoms pointing at the hero's O (δ+)
+        [[1, "wd-n1"], [2, "wd-n2"]].forEach(([j, id]) => {
+          const q = poses[j], ux = q.x - h.x, uy = q.y - h.y, L = Math.hypot(ux, uy), r = W.RO + 0.55;
+          place(els[id], X(q.x + ux / L * r), Y(q.y + uy / L * r));
+        });
+        [[3, 0, "wd-n3"], [4, 1, "wd-n4"]].forEach(([j, k, id]) => {
+          const q = poses[j], hh = k === 0 ? q.h1 : q.h2;
+          let px = -(hh[1] - h.y), py = hh[0] - h.x; const L = Math.hypot(px, py); px /= L; py /= L;
+          if (px * (hh[0] - h.x) + py * (hh[1] - h.y) < 0 || (hh[0] - h.x) * px < 0) { px = -px; py = -py; }
+          place(els[id], X(hh[0] + px * (W.RH + 0.45)), Y(hh[1] + py * (W.RH + 0.45)));
+        });
+        // the hydrogen bond label: on the bond from the hero's first H to its neighbour's O
+        const nb = poses[1], hx = (h.h1[0] + nb.x) / 2, hy = (h.h1[1] + nb.y) / 2, bx = X(hx), by = Y(hy);
+        const lx = Math.min(980 - SIZE["wd-hblab"][0], bx + 40), ly = by + 150;
+        leadP.setAttribute("d", `M${bx} ${by} L${lx + 20} ${ly - 30}`); place(els["wd-hblab"], lx, ly, 0, 0);
+        // the escapee keeps its O–H bonds
+        const sc = poses[W.showcase], ex = X(sc.x), ey = Y(sc.y);
+        // label above the molecule while there is room, below it once it rises toward the readout
+        const ix = Math.max(100, Math.min(980 - SIZE["wd-intact"][0], ex - 240)), above = ey - 160 > 540;
+        const iy = above ? ey - 160 : ey + W.RO * cam.s + 70;
+        lead2P.setAttribute("d", above ? `M${ex} ${ey - W.RO * cam.s - 6} L${ix + 200} ${iy + 52}` : `M${ex} ${ey + W.RO * cam.s + 6} L${ix + 200} ${iy - 6}`);
+        place(els["wd-intact"], ix, iy, 0, 0);
+        // thermometer readout and average molecular speed (rms speed scales with the square root of kelvin)
+        tempEl.textContent = T.toFixed(1) + " °C"; tempEl.style.color = T >= 90 ? "#FF7A2F" : "#F4F7FA";
+        speedEl.textContent = `molecules' average speed +${Math.round((Math.sqrt((T + 273.15) / 293.15) - 1) * 100)}%`;
+      }
+      document.fonts.ready.then(() => {
+      measure();
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: D, duration: D, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      const pop = (sel, at) => tl.fromTo(sel, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, at);
+      const out = (sel, at) => { tl.to(sel, { opacity: 0, duration: 0.2, ease: "power2.in" }, at); tl.set(sel, { visibility: "hidden" }, at + 0.2); };
+      tl.set(["#wd-O", "#wd-H1", "#wd-H2", "#wd-dneg", "#wd-dpos1", "#wd-dpos2", "#wd-n1", "#wd-n2", "#wd-n3", "#wd-n4", "#wd-hblab", "#wd-lead", "#wd-intact", "#wd-lead2", "#wd-panel", "#wd-speed", "#wd-stuck"], { opacity: 0 }, 0);
+      // outer wrappers are positioned every frame; GSAP only animates the inner element
+      const show = (id, at) => { tl.set("#" + id, { opacity: 1 }, at); tl.fromTo("#" + id + "-i", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, at); };
+      show("wd-O", M.oxygen); show("wd-H1", M.hydrogens); show("wd-H2", M.hydrogens + 0.08);
+      show("wd-dneg", M.negative); show("wd-dpos1", M.positive); show("wd-dpos2", M.positive + 0.08);
+      out(["#wd-O", "#wd-H1", "#wd-H2"], M.pull0 - 0.4);
+      // "opposites attract": the neighbours' charges land next to the hero's, after the pull-back
+      show("wd-n1", M.attract); show("wd-n2", M.attract + 0.06); show("wd-n3", M.attract + 0.12); show("wd-n4", M.attract + 0.18);
+      out(["#wd-dneg", "#wd-dpos1", "#wd-dpos2", "#wd-n1", "#wd-n2", "#wd-n3", "#wd-n4"], M.hb + 0.2);
+      tl.fromTo("#wd-lead", { opacity: 0 }, { opacity: 1, duration: 0.2 }, M.hb + 0.25);
+      tl.fromTo("#wd-hblab", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power4.out" }, M.hb + 0.3);
+      out(["#wd-hblab", "#wd-lead"], M.heat + 1.6);
+      tl.fromTo("#wd-panel", { opacity: 0, y: -30 }, { opacity: 1, y: 0, duration: 0.45, ease: "expo.out" }, M.heat - 0.1);
+      tl.fromTo("#wd-speed", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, M.heat + 0.5);
+      // at 100 °C the number locks; the speed line gives way to the heat still pouring in
+      tl.fromTo("#wd-panel", { scale: 1, transformOrigin: "540px 316px" }, { scale: 1.06, duration: 0.1, ease: "power2.out" }, M.hundred);
+      tl.to("#wd-panel", { scale: 1, duration: 0.45, ease: "elastic.out(1, 0.5)" }, M.hundred + 0.1);
+      out("#wd-speed", M.stops - 0.35);
+      tl.fromTo("#wd-stuck", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, M.stops - 0.15);
+      tl.fromTo(["#wd-intact", "#wd-lead2"], { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power2.out" }, M.intact);
+      render(0);
+      window.__timelines["world"] = tl;
+      });
+    })();
+  </script>
+</template>

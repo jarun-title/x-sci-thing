@@ -1,0 +1,422 @@
+<title>Glass to Steam</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one cinematic stage, transport bar beneath, chapter strip as a timeline index. Single dark look by design (a lab at night). */
+:root {
+  --bg: #070b12;
+  --panel: #0e1520;
+  --line: #1d2a3a;
+  --fg: #e4ecf3;
+  --muted: #8193a6;
+  --water: #5fb8e6;
+  --heat: #ff9a3c;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--display); }
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--water); }
+h1 { margin: 4px 0 0; font-size: clamp(26px, 4.4vw, 40px); font-weight: 700; letter-spacing: -.02em; text-wrap: balance; }
+.meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #03060b; border: 1px solid var(--line); }
+canvas { display: block; width: 100%; height: 100%; }
+.transport { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 14px; font-weight: 600; }
+button:hover { border-color: var(--water); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--water); outline-offset: 2px; }
+#play { min-width: 92px; background: var(--water); color: #04121d; border-color: var(--water); }
+.scrub { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+input[type=range] { flex: 1; min-width: 0; accent-color: var(--water); }
+.time { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chapters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.chap { text-align: left; display: flex; flex-direction: column; gap: 3px; font-weight: 400; padding: 10px 12px; }
+.chap b { font-weight: 600; font-size: 14px; }
+.chap span { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chap.on { border-color: var(--heat); }
+.chap.on span { color: var(--heat); }
+.note { font-size: 13px; color: var(--muted); max-width: 68ch; line-height: 1.55; margin: 0; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Motion study · H₂O at 1 atm</div>
+      <h1>From a glass of water to steam</h1>
+    </div>
+    <div class="meta">32 s · 9 scenes · 8 cm → 60 pm</div>
+  </header>
+
+  <div class="stage"><canvas id="cv" width="1280" height="720" aria-label="Animation: a glass of water, zooming into molecules and an oxygen atom, then heating until it becomes vapor"></canvas></div>
+
+  <div class="transport">
+    <button id="play" type="button">Pause</button>
+    <button id="replay" type="button">Replay</button>
+    <div class="scrub">
+      <input id="scrub" type="range" min="0" max="32" step="0.01" value="0" aria-label="Timeline">
+      <span class="time" id="time">0.0 / 32.0 s</span>
+    </div>
+    <button id="fs" type="button">Full screen</button>
+  </div>
+
+  <div class="chapters" id="chapters"></div>
+
+  <p class="note">Colors follow the usual CPK convention: oxygen red, hydrogen white. The electron cloud shows where electrons are likely to be found, not orbits. The nucleus is drawn thousands of times too large; at true scale it would be invisible.</p>
+</div>
+
+<script>
+(() => {
+const W = 1280, H = 720, T_END = 32;
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+cv.width = W * DPR; cv.height = H * DPR;
+
+const FONT_D = '"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif';
+const FONT_M = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+
+// ---------- helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const lerp = (a, b, k) => a + (b - a) * k;
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const R = rng(7);
+const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+
+// ---------- timeline ----------
+const CHAPTERS = [
+  [0,  'A glass of water', 'About 250 mL at room temperature'],
+  [4,  'Zooming in', 'Roughly 100 million times closer'],
+  [8,  'Water molecules', 'H₂O · oxygen red, hydrogen white'],
+  [12, 'Into one molecule', 'Heading for the oxygen atom'],
+  [15, 'An oxygen atom', '8 protons · 8 neutrons · 8 electrons'],
+  [18, 'Back to the molecules', 'Heat is being added'],
+  [20, 'Heating up', 'More energy means faster motion'],
+  [24, 'Bonds break', 'Molecules escape as water vapor'],
+  [27, 'Steam', 'Liquid becomes gas at 100 °C'],
+];
+const heatAt = t => ease(seg(t, 15.5, 25));
+const vapAt = t => seg(t, 24, 29.5);
+
+// integrated "agitation" time so jiggle speeds up smoothly with heat
+const DT = 0.01, TAU = new Float32Array(Math.ceil(T_END / DT) + 2);
+for (let i = 1; i < TAU.length; i++) TAU[i] = TAU[i - 1] + DT * (1 + 3.2 * heatAt(i * DT));
+const tauAt = t => { const k = clamp(t, 0, T_END) / DT, i = Math.floor(k); return lerp(TAU[i], TAU[i + 1] || TAU[i], k - i); };
+
+// ---------- sprites ----------
+function sprite(r, stops) {
+  const c = document.createElement('canvas'); const s = Math.ceil(r * 2 * 2);
+  c.width = c.height = s; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(s * .38, s * .36, s * .02, s / 2, s / 2, s / 2);
+  stops.forEach(([o, col]) => gr.addColorStop(o, col));
+  g.fillStyle = gr; g.beginPath(); g.arc(s / 2, s / 2, s / 2, 0, 7); g.fill(); return c;
+}
+const SPR_O = sprite(22, [[0, '#ffc2b3'], [.35, '#e2584a'], [1, '#7a1d1a']]);
+const SPR_H = sprite(13, [[0, '#ffffff'], [.5, '#e8edf2'], [1, '#8a97a6']]);
+const SPR_P = sprite(7, [[0, '#ffb3a6'], [.5, '#e2584a'], [1, '#8a2420']]);
+const SPR_N = sprite(7, [[0, '#e9eef3'], [.5, '#9aa6b2'], [1, '#4d5866']]);
+const PUFF = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(235,242,248,0.9)'); gr.addColorStop(1, 'rgba(235,242,248,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return c; })();
+const GLOW = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,154,60,0.9)'); gr.addColorStop(1, 'rgba(255,120,40,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return c; })();
+
+// ---------- molecules ----------
+const SP = 92, MOL = [];
+const HALF = 104.5 / 2 * Math.PI / 180, OH = 34;
+for (let row = -13; row <= 13; row++) for (let col = -22; col <= 22; col++) {
+  const center = row === 0 && col === 0;
+  MOL.push({
+    bx: col * SP + (row & 1 ? SP / 2 : 0) + (center ? 0 : (R() - .5) * 36),
+    by: row * SP * .87 + (center ? 0 : (R() - .5) * 36),
+    a0: center ? -Math.PI / 2 : R() * Math.PI * 2,
+    p1: R() * 7, p2: R() * 7, p3: R() * 7, fr: .7 + R() * .6,
+    vx: (R() - .5) * 1.6, vy: -(.5 + R() * 1.1), spin: (R() - .5) * 2, center,
+  });
+}
+// neighbour for hydrogen bond (nearest other molecule)
+MOL.forEach((m, i) => { let best = -1, bd = 1e9;
+  MOL.forEach((n, j) => { if (i === j) return; const d = (m.bx - n.bx) ** 2 + (m.by - n.by) ** 2; if (d < bd) { bd = d; best = j; } });
+  m.nb = best; });
+const CENTER = MOL.findIndex(m => m.center);
+
+function molState(m, t, h, v, tau) {
+  const amp = 4 + 16 * h;
+  const V = 1500 * Math.pow(v, 1.8);
+  const x = m.bx + amp * Math.sin(tau * 1.7 * m.fr + m.p1) + m.vx * V;
+  const y = m.by + amp * Math.cos(tau * 1.3 * m.fr + m.p2) + m.vy * V;
+  const a = m.a0 + (.12 + .6 * h) * Math.sin(tau * 1.1 * m.fr + m.p3) + m.spin * v * v * 8;
+  return { x, y, a,
+    h1x: x + OH * Math.cos(a - HALF), h1y: y + OH * Math.sin(a - HALF),
+    h2x: x + OH * Math.cos(a + HALF), h2y: y + OH * Math.sin(a + HALF) };
+}
+
+// ---------- atom clouds ----------
+const CLOUD = [];
+for (let i = 0; i < 420; i++) CLOUD.push({ x: gauss() * 26, y: gauss() * 26, k: 0, s: R() });                     // 1s
+for (let i = 0; i < 700; i++) { const r = 112 + gauss() * 24, th = R() * 7; CLOUD.push({ x: r * Math.cos(th), y: r * Math.sin(th) * .96, k: 1, s: R() }); } // 2s
+[[0, 1], [Math.PI / 3, .78], [2 * Math.PI / 3, .55]].forEach(([ang, len]) => {                                    // 2p lobes
+  for (let i = 0; i < 520; i++) { const d = (86 + gauss() * 26) * (R() < .5 ? -1 : 1) * len, w = gauss() * (18 + Math.abs(d) * .22);
+    CLOUD.push({ x: d * Math.cos(ang) - w * Math.sin(ang), y: d * Math.sin(ang) + w * Math.cos(ang), k: 2, s: R() }); }
+});
+const NUC = []; for (let i = 0; i < 16; i++) { const r = 5.2 * Math.sqrt(i + .5), th = i * 2.39996; NUC.push({ x: r * Math.cos(th), y: r * Math.sin(th), p: i % 2 === 0 }); }
+
+// ---------- glass ----------
+const G = { cx: 640, top: 160, bot: 560, th: 140, bh: 112 };
+const halfAt = y => lerp(G.th, G.bh, (y - G.top) / (G.bot - G.top));
+
+function drawGlass(t, s, tx, ty, h, steam, drop) {
+  const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#0a1220'); bg.addColorStop(1, '#04070c');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-tx, -ty);
+  // table
+  ctx.fillStyle = '#0c121b'; ctx.fillRect(-3000, G.bot, 7000, 3000);
+  ctx.fillStyle = 'rgba(95,184,230,0.08)'; ctx.fillRect(-3000, G.bot, 7000, 1.5);
+  const sh = ctx.createRadialGradient(G.cx, G.bot + 6, 10, G.cx, G.bot + 6, 200);
+  sh.addColorStop(0, 'rgba(95,184,230,0.18)'); sh.addColorStop(1, 'rgba(95,184,230,0)');
+  ctx.fillStyle = sh; ctx.beginPath(); ctx.ellipse(G.cx, G.bot + 6, 200, 26, 0, 0, 7); ctx.fill();
+
+  // water body
+  const wl = 250 + drop * 230, inner = 6, wb = G.bot - 16;
+  const hw = halfAt(wl) - inner;
+  const wg = ctx.createLinearGradient(0, wl, 0, wb);
+  wg.addColorStop(0, `rgba(${lerp(63, 120, h)|0},${lerp(159, 150, h)|0},${lerp(214, 190, h)|0},0.62)`);
+  wg.addColorStop(1, 'rgba(22,82,128,0.86)');
+  ctx.fillStyle = wg; ctx.beginPath();
+  ctx.moveTo(G.cx - hw, wl); ctx.lineTo(G.cx + hw, wl);
+  ctx.lineTo(G.cx + halfAt(wb) - inner, wb); ctx.lineTo(G.cx - halfAt(wb) + inner, wb); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(22,82,128,0.86)'; ctx.beginPath(); ctx.ellipse(G.cx, wb, halfAt(wb) - inner, 9, 0, 0, Math.PI); ctx.fill();
+
+  // bubbles when hot
+  if (h > .55) { const bi = (h - .55) / .45;
+    for (let i = 0; i < 34; i++) { const r = rng(i * 91 + 3); const x0 = (r() - .5) * 1.7, per = 1.4 + r() * 1.6, ph = r();
+      const age = ((t / per + ph) % 1); const y = lerp(wb - 6, wl + 6, age);
+      const x = G.cx + x0 * (halfAt(y) - 14) + Math.sin(age * 9 + i) * 4;
+      ctx.strokeStyle = `rgba(220,240,252,${.55 * bi})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(x, y, 1.5 + r() * 3.5 + age * 2, 0, 7); ctx.stroke(); } }
+
+  // surface
+  ctx.fillStyle = 'rgba(150,215,245,0.38)'; ctx.beginPath(); ctx.ellipse(G.cx, wl, hw, 11, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(210,240,255,0.55)'; ctx.lineWidth = 1.4; ctx.beginPath();
+  for (let i = 0; i <= 60; i++) { const k = i / 60, a = Math.PI * k;
+    const x = G.cx - hw * Math.cos(a), y = wl + 11 * Math.sin(a) + Math.sin(k * 14 + t * (3 + 6 * h)) * (1 + 2.5 * h);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+
+  // glass walls
+  ctx.strokeStyle = 'rgba(214,232,244,0.55)'; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.moveTo(G.cx - G.th, G.top); ctx.lineTo(G.cx - G.bh, G.bot); ctx.lineTo(G.cx + G.bh, G.bot); ctx.lineTo(G.cx + G.th, G.top); ctx.stroke();
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(G.cx, G.top, G.th, 14, 0, 0, 7); ctx.stroke();
+  ctx.fillStyle = 'rgba(200,225,240,0.16)'; ctx.beginPath();
+  ctx.moveTo(G.cx - G.bh + 2, G.bot - 16); ctx.lineTo(G.cx + G.bh - 2, G.bot - 16); ctx.lineTo(G.cx + G.bh, G.bot); ctx.lineTo(G.cx - G.bh, G.bot); ctx.fill();
+  const hl = ctx.createLinearGradient(G.cx - G.th + 10, 0, G.cx - G.th + 40, 0);
+  hl.addColorStop(0, 'rgba(255,255,255,0.22)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hl; ctx.beginPath(); ctx.moveTo(G.cx - G.th + 12, G.top + 20); ctx.lineTo(G.cx - G.th + 40, G.top + 20);
+  ctx.lineTo(G.cx - G.bh + 34, G.bot - 30); ctx.lineTo(G.cx - G.bh + 10, G.bot - 30); ctx.fill();
+
+  // steam
+  if (steam > 0) {
+    for (let i = 0; i < 90; i++) { const r = rng(i * 37 + 11); const per = 3 + r() * 2, ph = r();
+      const age = ((t / per + ph) % 1);
+      const x = G.cx + (r() - .5) * 220 + Math.sin(age * 4 + i) * 40 * age;
+      const y = wl - 6 - age * 430; const rad = 14 + age * 70;
+      ctx.globalAlpha = steam * .16 * Math.sin(Math.PI * age);
+      ctx.drawImage(PUFF, x - rad, y - rad, rad * 2, rad * 2); }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+// ---------- molecule view ----------
+function drawMolecules(t, m, h, v, labelA, alpha) {
+  const tau = tauAt(t);
+  const liquid = 1 - v;
+  ctx.fillStyle = `rgb(${lerp(8, 15, liquid)|0},${lerp(12, 52, liquid)|0},${lerp(20, 86, liquid)|0})`;
+  ctx.fillRect(0, 0, W, H);
+  if (h > 0) { const g = ctx.createRadialGradient(W / 2, H, 50, W / 2, H, 900);
+    g.addColorStop(0, `rgba(255,122,42,${.32 * h})`); g.addColorStop(1, 'rgba(255,122,42,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+
+  const c = molState(MOL[CENTER], t, h, 0, tau);
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(m, m); ctx.translate(-c.x, -c.y);
+  const vw = W / 2 / m + 80, vh = H / 2 / m + 80;
+  const states = MOL.map(mm => molState(mm, t, h, v, tau));
+
+  // hydrogen bonds
+  const ba = (1 - .75 * h) * (1 - clamp(v * 3));
+  if (ba > .01) { ctx.setLineDash([5, 6]); ctx.lineWidth = 2; ctx.strokeStyle = `rgba(150,215,245,${.45 * ba})`; ctx.beginPath();
+    MOL.forEach((mm, i) => { const s = states[i], n = states[mm.nb];
+      if (Math.abs(s.x - c.x) > vw || Math.abs(s.y - c.y) > vh) return;
+      ctx.moveTo(s.h1x, s.h1y); ctx.lineTo(n.x, n.y); });
+    ctx.stroke(); ctx.setLineDash([]); }
+
+  MOL.forEach((mm, i) => { const s = states[i];
+    if (Math.abs(s.x - c.x) > vw || Math.abs(s.y - c.y) > vh) return;
+    if (h > .05) { ctx.globalAlpha = .5 * h; ctx.drawImage(GLOW, s.x - 48, s.y - 48, 96, 96); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = 'rgba(230,236,243,0.5)'; ctx.lineWidth = 6; ctx.beginPath();
+    ctx.moveTo(s.h1x, s.h1y); ctx.lineTo(s.x, s.y); ctx.lineTo(s.h2x, s.h2y); ctx.stroke();
+    ctx.drawImage(SPR_H, s.h1x - 13, s.h1y - 13, 26, 26);
+    ctx.drawImage(SPR_H, s.h2x - 13, s.h2y - 13, 26, 26);
+    ctx.drawImage(SPR_O, s.x - 22, s.y - 22, 44, 44);
+  });
+
+  // annotations on the centre molecule
+  if (labelA > 0) { const s = states[CENTER];
+    ctx.globalAlpha = labelA; ctx.strokeStyle = '#ffd27a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 50, s.a - HALF, s.a + HALF); ctx.stroke();
+    ctx.fillStyle = '#ffd27a'; ctx.font = `500 13px ${FONT_M}`; ctx.textAlign = 'center';
+    ctx.fillText('104.5°', s.x + 70 * Math.cos(s.a), s.y + 70 * Math.sin(s.a) + 4);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#e4ecf3';
+    ctx.fillText('O', s.x - 5, s.y - 30); ctx.fillText('H', s.h1x + 16, s.h1y + 4); ctx.fillText('H', s.h2x - 26, s.h2y + 4);
+    ctx.fillStyle = '#9fd6f2'; ctx.fillText('O–H bond · 96 pm', s.x + 58, s.y - 34);
+    const n = states[MOL[CENTER].nb]; const mx = (s.h1x + n.x) / 2, my = (s.h1y + n.y) / 2;
+    ctx.fillText('hydrogen bond', mx + 14, my + 22);
+    ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+// ---------- atom view ----------
+function drawAtom(t, a, h) {
+  ctx.fillStyle = '#04070d'; ctx.fillRect(0, 0, W, H);
+  const halo = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 300 * a);
+  halo.addColorStop(0, `rgba(${lerp(80, 255, h)|0},${lerp(170, 140, h)|0},${lerp(230, 70, h)|0},0.20)`); halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(a, a); ctx.rotate(t * .12);
+  ctx.globalCompositeOperation = 'lighter';
+  const jit = 2 + 7 * h, expand = 1 + .12 * h;
+  const cols = [[190, 235, 255], [120, 200, 245], [110, 160, 255]];
+  for (let i = 0; i < CLOUD.length; i++) { const p = CLOUD[i];
+    const flick = .45 + .55 * Math.abs(Math.sin(p.s * 50 + t * (5 + 10 * h)));
+    const cc = cols[p.k]; const r = lerp(cc[0], 255, h * .7), g = lerp(cc[1], 170, h * .7), b = lerp(cc[2], 90, h * .7);
+    ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${.55 * flick})`;
+    ctx.fillRect(p.x * expand + Math.sin(p.s * 90 + t * 9) * jit, p.y * expand + Math.cos(p.s * 70 + t * 8) * jit, 2.2, 2.2); }
+  ctx.globalCompositeOperation = 'source-over';
+  const ng = ctx.createRadialGradient(0, 0, 0, 0, 0, 46); ng.addColorStop(0, 'rgba(255,190,150,0.5)'); ng.addColorStop(1, 'rgba(255,190,150,0)');
+  ctx.fillStyle = ng; ctx.beginPath(); ctx.arc(0, 0, 46, 0, 7); ctx.fill();
+  const shake = 1.2 * h;
+  NUC.forEach((n, i) => ctx.drawImage(n.p ? SPR_P : SPR_N, n.x - 7 + Math.sin(t * 30 + i) * shake, n.y - 7 + Math.cos(t * 27 + i) * shake, 14, 14));
+  ctx.restore();
+
+  // labels
+  ctx.save(); ctx.font = `500 13px ${FONT_M}`; ctx.fillStyle = '#9fd6f2'; ctx.strokeStyle = 'rgba(159,214,242,0.5)'; ctx.lineWidth = 1;
+  const lx = W / 2 + 175 * a, ly = H / 2 - 120 * a;
+  ctx.beginPath(); ctx.moveTo(W / 2 + 96 * a, H / 2 - 66 * a); ctx.lineTo(lx - 6, ly + 4); ctx.stroke();
+  ctx.fillText('electron cloud', lx, ly); ctx.fillStyle = '#8193a6'; ctx.fillText('where electrons are likely to be', lx, ly + 18);
+  ctx.fillStyle = '#ffb3a6'; const nx = W / 2 - 240 * a, ny = H / 2 + 150 * a;
+  ctx.beginPath(); ctx.moveTo(W / 2 - 16, H / 2 + 14); ctx.lineTo(nx + 130, ny - 14); ctx.strokeStyle = 'rgba(255,179,166,0.5)'; ctx.stroke();
+  ctx.fillText('nucleus · 8 p⁺ 8 n', nx - 20, ny); ctx.fillStyle = '#8193a6'; ctx.fillText('drawn ~2,000× too large', nx - 20, ny + 18);
+  ctx.restore();
+}
+
+// ---------- HUD ----------
+function fmtLen(m) {
+  const u = [[1e-2, 'cm'], [1e-3, 'mm'], [1e-6, 'µm'], [1e-9, 'nm'], [1e-12, 'pm']];
+  for (const [f, n] of u) if (m >= f * .999) { const v = m / f; return (v >= 10 ? v.toFixed(0) : v.toPrecision(2).replace(/\.0$/, '')) + ' ' + n; }
+  return (m / 1e-12).toFixed(1) + ' pm';
+}
+function drawHUD(t, temp, logPPM) {
+  // vignette
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .95);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+  // chapter caption
+  let ci = 0; CHAPTERS.forEach((c, i) => { if (t >= c[0]) ci = i; });
+  const [st, title, sub] = CHAPTERS[ci]; const fade = Math.min(seg(t, st, st + .5), 1);
+  ctx.save(); ctx.globalAlpha = fade;
+  ctx.fillStyle = '#5fb8e6'; ctx.font = `500 13px ${FONT_M}`; ctx.fillText(String(ci + 1).padStart(2, '0') + ' / 09', 48, H - 112);
+  ctx.fillStyle = '#ffffff'; ctx.font = `700 38px ${FONT_D}`; ctx.fillText(title, 48, H - 72);
+  ctx.fillStyle = 'rgba(228,236,243,0.75)'; ctx.font = `400 18px ${FONT_D}`; ctx.fillText(sub, 48, H - 44);
+  ctx.restore();
+
+  // thermometer
+  const hot = (temp - 20) / 80; const tc = `rgb(${lerp(95, 255, hot)|0},${lerp(184, 154, hot)|0},${lerp(230, 60, hot)|0})`;
+  ctx.save(); ctx.font = `500 12px ${FONT_M}`; ctx.fillStyle = 'rgba(228,236,243,0.6)'; ctx.textAlign = 'right';
+  ctx.fillText('TEMPERATURE', W - 48, 54);
+  ctx.font = `700 34px ${FONT_D}`; ctx.fillStyle = tc; ctx.fillText(`${Math.round(temp)} °C`, W - 48, 92);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(W - 228, 104, 180, 4);
+  ctx.fillStyle = tc; ctx.fillRect(W - 228, 104, 180 * hot, 4);
+  if (temp >= 99.5) { ctx.font = `500 12px ${FONT_M}`; ctx.fillStyle = '#ff9a3c'; ctx.fillText('BOILING · 1 atm', W - 48, 128); }
+  ctx.restore();
+
+  // scale bar
+  const ppm = Math.pow(10, logPPM), raw = 140 / ppm, e = Math.pow(10, Math.floor(Math.log10(raw)));
+  const nice = [1, 2, 5, 10].map(k => k * e).reduce((a, b) => Math.abs(b - raw) < Math.abs(a - raw) ? b : a);
+  const px = nice * ppm, x1 = W - 48, x0 = x1 - px, y = H - 52;
+  ctx.save(); ctx.strokeStyle = 'rgba(228,236,243,0.85)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0, y - 6); ctx.lineTo(x0, y); ctx.lineTo(x1, y); ctx.lineTo(x1, y - 6); ctx.stroke();
+  ctx.font = `500 13px ${FONT_M}`; ctx.fillStyle = 'rgba(228,236,243,0.9)'; ctx.textAlign = 'right'; ctx.fillText(fmtLen(nice), x1, y - 14);
+  ctx.restore();
+}
+
+// ---------- frame ----------
+function render(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const h = heatAt(t), v = vapAt(t), temp = 20 + 80 * h;
+
+  // view weights
+  const glassA = t < 8 ? 1 - ease(seg(t, 6.4, 8)) : ease(seg(t, 26.8, 28.8));
+  const atomA = t < 16 ? ease(seg(t, 13.8, 15)) : 1 - ease(seg(t, 18, 19.4));
+  let molA = t < 13 ? ease(seg(t, 6.4, 8)) : (t < 16 ? 1 - ease(seg(t, 13.8, 15)) : ease(seg(t, 18, 19.4)) * (1 - ease(seg(t, 26.8, 28.8))));
+
+  // cameras
+  let gs, gtx, gty;
+  if (t < 16) { const k = ease(seg(t, 4, 8)); gs = Math.exp(Math.log(60) * k); gtx = 640; gty = lerp(370, 430, k); }
+  else { const k = ease(seg(t, 27, 30.5)); gs = Math.exp(Math.log(7) * (1 - k)); gtx = 640; gty = lerp(255, 370, k); }
+  let mz;
+  if (t < 9) mz = Math.exp(Math.log(.35) * (1 - ease(seg(t, 6, 8.5))));
+  else if (t < 16) mz = Math.exp(Math.log(6) * ease(seg(t, 12, 15)));
+  else mz = Math.exp(Math.log(6) * (1 - ease(seg(t, 18, 19.6)))) * lerp(1, .6, ease(seg(t, 24, 29)));
+  const az = t < 18 ? lerp(.75, 1.08, ease(seg(t, 13.5, 17.8))) : lerp(1.08, .7, ease(seg(t, 18, 19.4)));
+
+  ctx.fillStyle = '#03060b'; ctx.fillRect(0, 0, W, H);
+  if (glassA > 0) drawGlass(t, gs, gtx, gty, h, ease(seg(t, 25, 29)), ease(seg(t, 26, 32)) * .28);
+  if (molA > 0) { ctx.globalAlpha = molA; drawMolecules(t, mz, h, v, seg(t, 9, 9.8) * (1 - seg(t, 11.6, 12.2)), molA); ctx.globalAlpha = 1; }
+  if (atomA > 0) { ctx.globalAlpha = atomA; drawAtom(t, az, h); ctx.globalAlpha = 1; }
+
+  // scale: blend log(px per metre) by view weight
+  const lg = Math.log10(280 / 0.075 * gs), lm = Math.log10(34 / 96e-12 * mz), la = Math.log10(170 / 60e-12 * az);
+  const wsum = glassA + molA + atomA || 1;
+  drawHUD(t, temp, (glassA * lg + molA * lm + atomA * la) / wsum);
+}
+
+// ---------- playback ----------
+const playBtn = document.getElementById('play'), scrub = document.getElementById('scrub'), timeEl = document.getElementById('time');
+const chapEl = document.getElementById('chapters');
+const chapBtns = CHAPTERS.map(([st, title], i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chap';
+  b.innerHTML = `<span>${String(i + 1).padStart(2, '0')} · ${st.toFixed(0)} s</span><b>${title}</b>`;
+  b.addEventListener('click', () => { T = st + .01; if (!playing) frame(); }); chapEl.appendChild(b); return b; });
+
+let T = 0, playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, last = null;
+if (!playing) T = 9.5;
+function frame() {
+  render(T); scrub.value = T; timeEl.textContent = `${T.toFixed(1)} / ${T_END.toFixed(1)} s`;
+  let ci = 0; CHAPTERS.forEach((c, i) => { if (T >= c[0]) ci = i; }); chapBtns.forEach((b, i) => b.classList.toggle('on', i === ci));
+  playBtn.textContent = playing ? 'Pause' : (T >= T_END ? 'Play again' : 'Play');
+}
+function loop(now) {
+  if (playing) { if (last != null) T += Math.min(.05, (now - last) / 1000); last = now;
+    if (T >= T_END) { T = T_END; playing = false; } frame(); } else last = null;
+  requestAnimationFrame(loop);
+}
+playBtn.addEventListener('click', () => { if (T >= T_END) T = 0; playing = !playing; frame(); });
+document.getElementById('replay').addEventListener('click', () => { T = 0; playing = true; frame(); });
+scrub.addEventListener('input', () => { T = +scrub.value; frame(); });
+document.getElementById('fs').addEventListener('click', () => { const s = document.querySelector('.stage');
+  try { const p = s.requestFullscreen ? s.requestFullscreen() : null; if (p && p.catch) p.catch(() => {}); } catch (e) {} });
+frame();
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(frame);
+requestAnimationFrame(loop);
+})();
+</script>

@@ -1,0 +1,23 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #E8EDF1; overflow: hidden; }
+    #hk-svg { position: absolute; inset: 0; }
+    #hk-note { position: absolute; left: 0; width: 1080px; top: 446px; text-align: center; font-family: Inter; font-weight: 700; font-size: 34px; color: #4A5B68; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920">
+    <svg id="hk-svg"></svg>
+    <div id="hk-note">at sea level · flame on high</div>
+  </div>
+  <script>
+    (() => {
+      const k = window.Kitchen(document.getElementById("hk-svg"), "hk");
+      // already boiling: the dot creeps along the flat part of the curve while the flame keeps going
+      const render = t => k.update(t, { u: 0.86 + 0.1 * Math.min(1, t / 5.776), flicker: true, boil: 1, flame: 1 });
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: 5.776, duration: 5.776, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      render(0);
+      window.__timelines["hook"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,52 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #05080f; overflow: hidden; }
+    #a-footage { position: absolute; inset: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    .a-title { position: absolute; left: 144px; top: 120px; font-size: 76px; font-weight: 900; letter-spacing: -0.03em; }
+    .a-title span { display: inline-block; margin-right: 0.22em; }
+    .a-label { position: absolute; font-family: "JetBrains Mono", monospace; font-size: 34px; line-height: 1.35; white-space: nowrap; text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+    .a-label small { display: block; font-size: 28px; color: #9aabbd; }
+    #a-lines { position: absolute; inset: 0; }
+    #a-temp { position: absolute; right: 144px; top: 120px; text-align: right; }
+    #a-temp .k { font-family: "JetBrains Mono", monospace; font-size: 28px; color: #9aabbd; letter-spacing: 0.14em; }
+    #a-temp .v { font-size: 88px; font-weight: 900; letter-spacing: -0.03em; color: #ffb070; font-variant-numeric: tabular-nums; }
+  </style>
+  <div id="root" data-composition-id="atom" data-width="1920" data-height="1080">
+    <!-- rendered in Blender (Cycles): nucleus of 16 nucleons inside a cloud of glowing points shaped like the 1s, 2s and 2p orbitals.
+         The camera eases in until 1.4 s, heat warms the glow from 2.9 s, and from 4.4 s the camera pulls far away. -->
+    <video id="a-footage" class="clip" src="assets/video/atom.mp4" data-start="0" data-duration="5" muted></video>
+    <h1 class="a-title" id="a-title"><span>One</span><span>oxygen</span><span>atom.</span></h1>
+    <svg id="a-lines" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <!-- leader starts measured on the footage: the 2s shell edge (about 250 px out) and the nucleus at the centre -->
+      <path id="a-l1" d="M1150 382 L1222 352" fill="none" stroke="#9fd6f2" stroke-width="2" />
+      <path id="a-l2" d="M935 565 L700 760" fill="none" stroke="#ffb3a6" stroke-width="2" />
+    </svg>
+    <div class="a-label" id="a-cloud" style="left:1232px; top:318px; color:#9fd6f2">electron cloud<small>where its 8 electrons tend to be</small></div>
+    <div class="a-label" id="a-nuc" style="left:330px; top:774px; color:#ffb3a6">nucleus · 8 protons + 8 neutrons<small>drawn ~5,000× too big to be visible</small></div>
+    <div id="a-temp"><div class="k">TEMPERATURE</div><div class="v" id="a-tv">20 °C</div></div>
+  </div>
+  <script>
+    (() => {
+      const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+      const heatAt = t => 0.25 * clamp((t - 2.9) / 2.1);   // same curve the Blender scene uses for the glow
+      const tv = document.getElementById("a-tv");
+      function render(t) { tv.textContent = Math.round(20 + 80 * heatAt(t)) + " °C"; }
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: 5, duration: 5, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      tl.fromTo("#a-footage", { opacity: 0, filter: "blur(12px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 0);
+      // per word from grey to ink
+      tl.fromTo("#a-title span", { opacity: 1, color: "#3a4656" }, { color: "#e8eef4", duration: 0.2, stagger: 0.09, ease: "power2.out" }, 0.5);
+      tl.fromTo("#a-l1", { strokeDasharray: 260, strokeDashoffset: 260 }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, 1.2);
+      tl.fromTo("#a-cloud", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.45);
+      tl.fromTo("#a-l2", { strokeDasharray: 320, strokeDashoffset: 320 }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, 1.45);
+      tl.fromTo("#a-nuc", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.7);
+      tl.to(["#a-title", "#a-l1", "#a-l2", "#a-cloud", "#a-nuc"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power2.in" }, 4.1);
+      tl.fromTo("#a-temp", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 2.9);
+      // the footage pulls far away from 4.4 s; fade the last of it to dark
+      tl.to("#a-footage", { opacity: 0, duration: 0.2, ease: "power2.in" }, 4.75);
+      render(0);
+      window.__timelines["atom"] = tl;
+    })();
+  </script>
+</template>

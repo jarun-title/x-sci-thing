@@ -1,0 +1,30 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #05080d; overflow: hidden; }
+    #g-footage { position: absolute; inset: 0; width: 1920px; height: 1080px; object-fit: cover; }
+    #g-scrim { position: absolute; inset: 0; background: linear-gradient(to right, rgba(3,5,9,0.82) 0%, rgba(3,5,9,0.5) 38%, rgba(3,5,9,0) 55%); }
+    #g-flood { position: absolute; inset: 0; background: #14507e; opacity: 0; }
+    .g-title { position: absolute; left: 144px; top: 150px; font-size: 92px; font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+    .g-title span { display: inline-block; margin-right: 0.24em; }
+    .g-sub { position: absolute; left: 148px; top: 272px; line-height: 1.5; font-family: "JetBrains Mono", monospace; font-size: 30px; color: #7fb6d8; letter-spacing: 0.04em; }
+  </style>
+  <div id="root" data-composition-id="glass" data-width="1920" data-height="1080">
+    <!-- rendered in Blender (Cycles): glass on a table, slow push, then the camera dives into the water -->
+    <video id="g-footage" class="clip" src="assets/video/intro.mp4" data-start="0" data-duration="5.5" muted></video>
+    <div id="g-scrim"></div>
+    <div id="g-flood"></div>
+    <h1 class="g-title" id="g-title"><span>A</span><span>glass</span><span>of</span><span>water.</span></h1>
+    <div class="g-sub" id="g-sub">250 mL · 20 °C<br>≈ 8.4 × 10²⁴ molecules</div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#g-title span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, stagger: 0.067, ease: "power4.out" }, 1.3);
+      tl.fromTo("#g-sub", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power2.out" }, 1.75);
+      tl.to(["#g-title", "#g-sub", "#g-scrim"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power2.in" }, 4.4);
+      // the dive ends inside the water; the frame floods to the molecule scene's blue
+      tl.fromTo("#g-flood", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.in" }, 4.82);
+      window.__timelines["glass"] = tl;
+    })();
+  </script>
+</template>

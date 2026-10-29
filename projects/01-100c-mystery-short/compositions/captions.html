@@ -1,0 +1,112 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; pointer-events: none; }
+    .cap { position: absolute; left: 0; width: 1080px; top: 1196px; padding: 0 90px; text-align: center; font-family: Inter; font-weight: 900;
+           font-size: 72px; line-height: 1.12; color: #FFFFFF; paint-order: stroke fill; -webkit-text-stroke: 14px #0B1620; letter-spacing: -0.01em; }
+  </style>
+  <div id="root" data-composition-id="captions" data-width="1080" data-height="1920">
+    <div class="cap" id="cap0">The flame is</div>
+    <div class="cap" id="cap1">still on.</div>
+    <div class="cap" id="cap2">So why is</div>
+    <div class="cap" id="cap3">this water stuck</div>
+    <div class="cap" id="cap4">at exactly one</div>
+    <div class="cap" id="cap5"><span style="color:#FF9A5A">hundred</span> <span style="color:#FF9A5A">degrees?</span></div>
+    <div class="cap" id="cap6">Zoom in a</div>
+    <div class="cap" id="cap7">few <span style="color:#FF9A5A">hundred</span> million</div>
+    <div class="cap" id="cap8">times.</div>
+    <div class="cap" id="cap9">Each molecule is</div>
+    <div class="cap" id="cap10">one oxygen and</div>
+    <div class="cap" id="cap11">two hydrogens,</div>
+    <div class="cap" id="cap12">sharing <span style="color:#FFE08A">electrons.</span></div>
+    <div class="cap" id="cap13">Oxygen pulls the</div>
+    <div class="cap" id="cap14">shared <span style="color:#FFE08A">electrons</span> harder,</div>
+    <div class="cap" id="cap15">so it turns</div>
+    <div class="cap" id="cap16">slightly <span style="color:#FFFFFF">negative,</span></div>
+    <div class="cap" id="cap17">and the hydrogens</div>
+    <div class="cap" id="cap18">slightly <span style="color:#FFFFFF">positive.</span></div>
+    <div class="cap" id="cap19">Opposites attract.</div>
+    <div class="cap" id="cap20">Neighbors cling together</div>
+    <div class="cap" id="cap21">with <span style="color:#9ED3FF">hydrogen</span> <span style="color:#9ED3FF">bonds.</span></div>
+    <div class="cap" id="cap22"><span style="color:#FF9A5A">Heat</span> makes them</div>
+    <div class="cap" id="cap23">jiggle faster and</div>
+    <div class="cap" id="cap24">faster,</div>
+    <div class="cap" id="cap25">and the <span style="color:#FF9A5A">temperature</span></div>
+    <div class="cap" id="cap26"><span style="color:#FF9A5A">climbs.</span></div>
+    <div class="cap" id="cap27">But at one</div>
+    <div class="cap" id="cap28"><span style="color:#FF9A5A">hundred</span> <span style="color:#FF9A5A">degrees,</span></div>
+    <div class="cap" id="cap29">the <span style="color:#FF9A5A">heat</span> stops</div>
+    <div class="cap" id="cap30">raising the <span style="color:#FF9A5A">temperature.</span></div>
+    <div class="cap" id="cap31">It goes into</div>
+    <div class="cap" id="cap32">snapping <span style="color:#9ED3FF">hydrogen</span> <span style="color:#9ED3FF">bonds,</span></div>
+    <div class="cap" id="cap33">and setting molecules</div>
+    <div class="cap" id="cap34">free.</div>
+    <div class="cap" id="cap35">Free molecules spread</div>
+    <div class="cap" id="cap36">out.</div>
+    <div class="cap" id="cap37">One cup of</div>
+    <div class="cap" id="cap38">water becomes about</div>
+    <div class="cap" id="cap39">sixteen <span style="color:#FF9A5A">hundred</span> cups</div>
+    <div class="cap" id="cap40">of steam.</div>
+    <div class="cap" id="cap41">That&#x27;s boiling:</div>
+    <div class="cap" id="cap42"><span style="color:#FF9A5A">heat</span> that frees</div>
+    <div class="cap" id="cap43">water instead of</div>
+    <div class="cap" id="cap44">warming it.</div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      const show = (sel, a, b) => {
+        tl.set(sel, { opacity: 0, visibility: "hidden" }, 0);
+        tl.set(sel, { visibility: "visible" }, a);
+        tl.fromTo(sel, { opacity: 0, scale: 0.94, transformOrigin: "540px 1240px" }, { opacity: 1, scale: 1, duration: 0.1, ease: "expo.out" }, a);
+        tl.to(sel, { opacity: 0, duration: 0.08, ease: "power2.in" }, b - 0.08);
+        tl.set(sel, { opacity: 0, visibility: "hidden" }, b);
+      };
+      show("#cap0", 0.18, 0.94);
+      show("#cap1", 0.94, 1.76);
+      show("#cap2", 1.94, 2.57);
+      show("#cap3", 2.57, 3.47);
+      show("#cap4", 3.47, 4.51);
+      show("#cap5", 4.51, 5.82);
+      show("#cap6", 5.916, 6.546);
+      show("#cap7", 6.546, 7.666);
+      show("#cap8", 7.666, 8.376);
+      show("#cap9", 8.413, 9.713);
+      show("#cap10", 9.713, 10.673);
+      show("#cap11", 10.673, 11.913);
+      show("#cap12", 11.913, 13.513);
+      show("#cap13", 13.564, 14.724);
+      show("#cap14", 14.724, 16.474);
+      show("#cap15", 16.544, 17.174);
+      show("#cap16", 17.174, 18.554);
+      show("#cap17", 18.664, 19.684);
+      show("#cap18", 19.684, 21.024);
+      show("#cap19", 21.398, 22.678);
+      show("#cap20", 22.818, 24.088);
+      show("#cap21", 24.088, 25.648);
+      show("#cap22", 25.773, 26.663);
+      show("#cap23", 26.663, 27.563);
+      show("#cap24", 27.563, 28.413);
+      show("#cap25", 28.413, 29.533);
+      show("#cap26", 29.533, 30.063);
+      show("#cap27", 30.14, 30.72);
+      show("#cap28", 30.72, 31.86);
+      show("#cap29", 31.86, 32.59);
+      show("#cap30", 32.59, 34.25);
+      show("#cap31", 34.284, 35.184);
+      show("#cap32", 35.184, 36.844);
+      show("#cap33", 36.844, 38.074);
+      show("#cap34", 38.074, 38.654);
+      show("#cap35", 38.874, 40.144);
+      show("#cap36", 40.144, 40.764);
+      show("#cap37", 40.944, 41.494);
+      show("#cap38", 41.494, 42.914);
+      show("#cap39", 42.914, 43.744);
+      show("#cap40", 43.744, 44.654);
+      show("#cap41", 44.976, 46.076);
+      show("#cap42", 46.176, 46.726);
+      show("#cap43", 46.726, 47.776);
+      show("#cap44", 47.776, 48.746);
+      window.__timelines["captions"] = tl;
+    })();
+  </script>
+</template>

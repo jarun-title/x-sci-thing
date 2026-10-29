@@ -1,0 +1,62 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, #0f1a2b 0%, #070b12 70%); overflow: hidden; }
+    #g-cam { position: absolute; inset: 0; transform-origin: 1240px 660px; }
+    #g-cam svg { position: absolute; inset: 0; }
+    #g-water { transform-box: fill-box; transform-origin: 50% 100%; }
+    #g-flood { position: absolute; inset: 0; background: #14507e; opacity: 0; }
+    .g-title { position: absolute; left: 144px; top: 150px; font-size: 92px; font-weight: 900; letter-spacing: -0.035em; line-height: 1; }
+    .g-title span { display: inline-block; margin-right: 0.24em; }
+    .g-sub { position: absolute; left: 148px; top: 272px; line-height: 1.5; font-family: "JetBrains Mono", monospace; font-size: 30px; color: #7fb6d8; letter-spacing: 0.04em; }
+  </style>
+  <div id="root" data-composition-id="glass" data-width="1920" data-height="1080">
+    <div id="g-cam">
+      <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+        <defs>
+          <linearGradient id="g-wgrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#4fb0e4" stop-opacity="0.8" />
+            <stop offset="1" stop-color="#14507e" stop-opacity="0.95" />
+          </linearGradient>
+          <linearGradient id="g-shine" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#fff" stop-opacity="0.22" />
+            <stop offset="1" stop-color="#fff" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(280 0)">
+        <rect x="-2000" y="840" width="6000" height="600" fill="#0b111a" />
+        <ellipse cx="960" cy="848" rx="300" ry="34" fill="#3f9fd6" opacity="0.12" />
+        <g id="g-water">
+          <path d="M761 375 L1159 375 L1120 816 L800 816 Z" fill="url(#g-wgrad)" />
+          <ellipse cx="960" cy="375" rx="199" ry="16" fill="#9ad8f7" opacity="0.55" />
+        </g>
+        <path id="g-outline" d="M750 240 L792 840 L1128 840 L1170 240" fill="none" stroke="#dbe9f3" stroke-width="5" stroke-linejoin="round" stroke-dasharray="1500" stroke-dashoffset="1500" />
+        <ellipse id="g-rim" cx="960" cy="240" rx="210" ry="20" fill="none" stroke="#dbe9f3" stroke-width="3" opacity="0" />
+        <path id="g-glint" d="M772 290 L810 290 L840 780 L806 780 Z" fill="url(#g-shine)" opacity="0" />
+        </g>
+      </svg>
+    </div>
+    <div id="g-flood"></div>
+    <h1 class="g-title" id="g-title"><span>A</span><span>glass</span><span>of</span><span>water.</span></h1>
+    <div class="g-sub" id="g-sub">250 mL · 20 °C<br>≈ 8.4 × 10²⁴ molecules</div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // glass draws itself, water rises
+      tl.fromTo("#g-outline", { strokeDashoffset: 1500 }, { strokeDashoffset: 0, duration: 1.1, ease: "power2.inOut" }, 0.15);
+      tl.fromTo("#g-rim", { opacity: 0 }, { opacity: 0.7, duration: 0.4, ease: "power2.out" }, 0.9);
+      tl.fromTo("#g-glint", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 1.1);
+      tl.fromTo("#g-water", { scaleY: 0 }, { scaleY: 1, duration: 1.3, ease: "expo.out" }, 0.75);
+      // title per word, blur in, no translate
+      tl.fromTo("#g-title span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, stagger: 0.067, ease: "power4.out" }, 1.3);
+      tl.fromTo("#g-sub", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power2.out" }, 1.75);
+      tl.to(["#g-title", "#g-sub"], { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power2.in" }, 3.75);
+      // zoom through the water: the water becomes the world
+      tl.set("#g-cam", { scale: 1, filter: "blur(0px)" }, 0);
+      tl.to("#g-cam", { scale: 42, duration: 1.45, ease: "power3.in" }, 3.95);
+      tl.to("#g-cam", { filter: "blur(10px)", duration: 0.5, ease: "power2.in" }, 4.85);
+      tl.fromTo("#g-flood", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.in" }, 5.0);
+      window.__timelines["glass"] = tl;
+    })();
+  </script>
+</template>

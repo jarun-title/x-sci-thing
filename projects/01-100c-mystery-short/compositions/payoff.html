@@ -1,0 +1,76 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: linear-gradient(#E4EFF7, #C6DDEE); overflow: hidden; }
+    #po-cv { position: absolute; inset: 0; width: 1080px; height: 1920px; }
+    #po-num { position: absolute; left: 0; width: 1080px; top: 168px; text-align: center; font-family: "League Gothic"; font-size: 260px; line-height: 1; color: #0E1A24; }
+    #po-sub { position: absolute; left: 0; width: 1080px; top: 438px; text-align: center; font-family: Inter; font-weight: 700; font-size: 40px; color: #33434F; }
+    #po-foot { position: absolute; left: 0; width: 1080px; top: 1122px; text-align: center; font-family: Inter; font-weight: 700; font-size: 34px; color: #4A5B68; }
+    #po-one { position: absolute; left: 0; width: 1080px; top: 1060px; text-align: center; font-family: Inter; font-weight: 900; font-size: 52px; color: #0E1A24; }
+  </style>
+  <div id="root" data-composition-id="payoff" data-width="1080" data-height="1920">
+    <canvas id="po-cv" width="1080" height="1920"></canvas>
+    <div id="po-num">× 1,600</div>
+    <div id="po-sub">cups of steam</div>
+    <div id="po-foot">at 100 °C and sea-level pressure</div>
+    <div id="po-one">1 cup of water</div>
+  </div>
+  <script>
+    (() => {
+      const W = window.Water2D, clamp = W.clamp, lerp = W.lerp;
+      const cv = document.getElementById("po-cv"), ctx = cv.getContext("2d");
+      const D = 6.082, M = {"one": 2.27, "becomes": 3.33, "sixteen": 4.24};
+      const eout = x => 1 - Math.pow(1 - x, 4), seg = (t, a, b) => clamp((t - a) / (b - a));
+      // a mug: body, handle, and (for the water mug) the water inside
+      function mug(cx, cy, s, water, alpha) {
+        if (alpha <= 0 || s <= 0) return;
+        ctx.save(); ctx.globalAlpha = alpha; ctx.translate(cx, cy); ctx.scale(s, s);
+        ctx.lineWidth = 7; ctx.strokeStyle = "#0E1A24"; ctx.lineJoin = "round";
+        ctx.beginPath(); ctx.moveTo(-40, -46); ctx.lineTo(-34, 44); ctx.quadraticCurveTo(-32, 52, -22, 52); ctx.lineTo(22, 52); ctx.quadraticCurveTo(32, 52, 34, 44); ctx.lineTo(40, -46); ctx.closePath();
+        ctx.fillStyle = water ? "#FFFFFF" : "rgba(255,255,255,0.75)"; ctx.fill();
+        if (water) { ctx.save(); ctx.clip(); ctx.fillStyle = "#2F7FBA"; ctx.fillRect(-50, -26, 100, 90); ctx.restore(); }
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(38, -26); ctx.bezierCurveTo(70, -26, 70, 26, 36, 26); ctx.stroke();
+        ctx.restore();
+      }
+      // a few free molecules drifting apart while "free molecules spread out" is said
+      const drift = [...Array(26)].map((_, i) => ({ a: i * 2.399, r: 60 + (i % 7) * 26, rot: i * 0.9 }));
+      function molecule(x, y, rot, s, a) {
+        ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.rotate(rot);
+        const H = 104.5 / 2 * Math.PI / 180;
+        [[Math.sin(H), Math.cos(H)], [-Math.sin(H), Math.cos(H)]].forEach(([hx, hy]) => { ctx.fillStyle = "#F3F6F8"; ctx.strokeStyle = "#8C9AA5"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hx * 0.96 * s, hy * 0.96 * s, 0.36 * s, 0, 7); ctx.fill(); ctx.stroke(); });
+        ctx.fillStyle = "#E5484D"; ctx.beginPath(); ctx.arc(0, 0, 0.62 * s, 0, 7); ctx.fill();
+        ctx.restore();
+      }
+      const GX = 540, GY = 800, CELL = 15, N = 40;       // 40 × 40 = 1,600 mugs
+      function render(t) {
+        ctx.clearRect(0, 0, 1080, 1920);
+        const spread = eout(seg(t, 0, M.one));
+        const fadeMol = 1 - seg(t, M.one - 0.3, M.one + 0.2);
+        drift.forEach((d, i) => molecule(540 + Math.cos(d.a) * d.r * (1 + 4 * spread), 780 + Math.sin(d.a) * d.r * (1 + 4 * spread), d.rot + t * 0.6, 34, fadeMol * 0.9));
+        // one mug of water arrives, then shrinks to its cell as the steam mugs fill the grid
+        const inA = eout(seg(t, M.one - 0.1, M.one + 0.35));
+        const shrink = W.smooth(seg(t, M.becomes, M.becomes + 0.6));
+        mug(GX, GY, lerp(3.2, CELL / 100 * 0.9, shrink) * inA, true, inA);
+        // keep the original cup findable inside the grid
+        if (shrink > 0.9) { ctx.save(); ctx.strokeStyle = "#0E1A24"; ctx.lineWidth = 4; ctx.globalAlpha = (shrink - 0.9) * 10; ctx.beginPath(); ctx.arc(GX, GY, CELL * 1.6, 0, 7); ctx.stroke(); ctx.restore(); }
+        const g0 = M.becomes + 0.35;
+        for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+          if (r === N / 2 && c === N / 2) continue;
+          const x = GX + (c - N / 2) * CELL, y = GY + (r - N / 2) * CELL, dist = Math.hypot(c - N / 2, r - N / 2) / (N * 0.71);
+          const a = eout(seg(t, g0 + dist * 1.1, g0 + dist * 1.1 + 0.25));
+          if (a > 0) mug(x, y, CELL / 100 * 0.9 * a, false, a);
+        }
+      }
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: D, duration: D, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      tl.fromTo("#po-one", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power4.out" }, M.one - 0.1);
+      tl.to("#po-one", { opacity: 0, duration: 0.18, ease: "power2.in" }, M.becomes + 0.6);
+      tl.fromTo("#po-num", { opacity: 0, scale: 0.8, transformOrigin: "540px 300px" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.5)" }, M.sixteen);
+      tl.fromTo("#po-sub", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, M.sixteen + 0.2);
+      tl.fromTo("#po-foot", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, M.becomes + 0.5);
+      render(0);
+      window.__timelines["payoff"] = tl;
+    })();
+  </script>
+</template>

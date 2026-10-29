@@ -1,0 +1,72 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #05080f; overflow: hidden; }
+    #h-cool { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, #123a5c 0%, #0a2238 85%); }
+    #h-warm { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 110%, #b4481a 0%, #4a1e12 45%, #1a0d0b 90%); opacity: 0; }
+    #h-air { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, #151b26 0%, #06080d 85%); opacity: 0; }
+    #h-canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    #h-scrim { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(5,8,14,0.78) 0%, rgba(5,8,14,0) 34%); }
+    .h-title { position: absolute; left: 144px; top: 120px; font-size: 76px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; max-width: 1150px; }
+    .h-title span { display: inline-block; margin-right: 0.22em; }
+    .h-title .accent { color: #ff9a3c; }
+    #h-temp { position: absolute; right: 144px; top: 120px; text-align: right; }
+    #h-temp .k { font-family: "JetBrains Mono", monospace; font-size: 24px; color: #a4927f; letter-spacing: 0.14em; }
+    #h-temp .v { font-size: 88px; font-weight: 900; letter-spacing: -0.03em; color: #ffb070; font-variant-numeric: tabular-nums; }
+    #h-bar { width: 320px; height: 8px; background: rgba(255,255,255,0.14); margin: 8px 0 0 auto; }
+    #h-fill { width: 100%; height: 100%; background: #ff9a3c; transform-origin: 0 50%; }
+    #h-boil { font-family: "JetBrains Mono", monospace; font-size: 26px; color: #ff9a3c; margin-top: 14px; letter-spacing: 0.06em; }
+  </style>
+  <div id="root" data-composition-id="heat" data-width="1920" data-height="1080">
+    <div id="h-cool"></div>
+    <div id="h-warm"></div>
+    <div id="h-air"></div>
+    <canvas id="h-canvas" width="1920" height="1080"></canvas>
+    <div id="h-scrim"></div>
+    <h1 class="h-title" id="h-t1"><span>Heat</span><span>makes</span><span>them</span><span class="accent">move</span><span class="accent">faster.</span></h1>
+    <h1 class="h-title" id="h-t2"><span>Bonds</span><span>break.</span><span>Molecules</span><span>escape</span><span>as</span><span class="accent">vapor.</span></h1>
+    <div id="h-temp">
+      <div class="k">TEMPERATURE</div>
+      <div class="v" id="h-tv">40 °C</div>
+      <div id="h-bar"><div id="h-fill"></div></div>
+      <div id="h-boil">BOILING · 1 atm</div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const cv = document.getElementById("h-canvas"), ctx = cv.getContext("2d");
+      const { drawMolecules, clamp } = window.H2O;
+      const io = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+      const heatAt = t => 0.25 + 0.75 * io(clamp(t / 4.2));
+      const vapAt = t => clamp((t - 4.1) / 2.9);
+      // agitation clock: integrate heat once at load, look it up per frame
+      const DT = 0.01, N = Math.ceil(7 / DT) + 2, TAU = new Float32Array(N);
+      for (let i = 1; i < N; i++) TAU[i] = TAU[i - 1] + DT * (1 + 3.2 * heatAt(i * DT));
+      const tauAt = t => { const k = clamp(t, 0, 7) / DT, i = Math.floor(k); return TAU[i] + (TAU[Math.min(i + 1, N - 1)] - TAU[i]) * (k - i); };
+      const zoomAt = t => { const k = clamp(t / 0.9); const back = 6 - 5 * (1 - Math.pow(1 - k, 4)); return back * (1 - 0.4 * clamp((t - 4.2) / 2.8)); };
+      const tv = document.getElementById("h-tv"), fill = document.getElementById("h-fill");
+      function render(t) {
+        const h = heatAt(t);
+        drawMolecules(ctx, 1920, 1080, { tau: tauAt(t) + 9, heat: h, vapor: vapAt(t), zoom: zoomAt(t) });
+        tv.textContent = Math.round(20 + 80 * h) + " °C";
+        fill.style.transform = `scaleX(${h})`;
+      }
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: 7, duration: 7, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      tl.fromTo("#h-canvas", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, 0);
+      // colour flood: the water warms, then empties into air
+      tl.fromTo("#h-warm", { opacity: 0.6 }, { opacity: 1, duration: 4.2, ease: "power2.inOut" }, 0);
+      tl.fromTo("#h-air", { opacity: 0 }, { opacity: 1, duration: 2.2, ease: "power2.inOut" }, 4.4);
+      tl.fromTo("#h-t1 span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, stagger: 0.067, ease: "power4.out" }, 0.7);
+      tl.to("#h-t1 span", { opacity: 0, filter: "blur(8px)", duration: 0.13, stagger: 0.03, ease: "power2.in" }, 3.6);
+      tl.fromTo("#h-t2 span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, stagger: 0.067, ease: "power4.out" }, 4.25);
+      tl.to("#h-t2 span", { opacity: 0, filter: "blur(8px)", duration: 0.13, stagger: 0.03, ease: "power2.in" }, 6.65);
+      // 100 °C lands
+      tl.fromTo("#h-boil", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, 4.2);
+      tl.fromTo("#h-tv", { scale: 1, transformOrigin: "100% 50%" }, { scale: 1.12, duration: 0.12, ease: "power2.out" }, 4.2);
+      tl.to("#h-tv", { scale: 1, duration: 0.5, ease: "elastic.out(1, 0.5)" }, 4.32);
+      render(0);
+      window.__timelines["heat"] = tl;
+    })();
+  </script>
+</template>

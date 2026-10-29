@@ -1,0 +1,622 @@
+{
+ "hook": {
+  "duration": 5.376,
+  "words": [
+   {
+    "text": "The",
+    "start": 0.03,
+    "end": 0.22
+   },
+   {
+    "text": "flame",
+    "start": 0.22,
+    "end": 0.58
+   },
+   {
+    "text": "is",
+    "start": 0.58,
+    "end": 0.79
+   },
+   {
+    "text": "still",
+    "start": 0.79,
+    "end": 0.91
+   },
+   {
+    "text": "on.",
+    "start": 0.91,
+    "end": 1.21
+   },
+   {
+    "text": "So",
+    "start": 1.79,
+    "end": 2.0
+   },
+   {
+    "text": "why",
+    "start": 2.0,
+    "end": 2.34
+   },
+   {
+    "text": "is",
+    "start": 2.34,
+    "end": 2.42
+   },
+   {
+    "text": "this",
+    "start": 2.42,
+    "end": 2.65
+   },
+   {
+    "text": "water",
+    "start": 2.65,
+    "end": 3.15
+   },
+   {
+    "text": "stuck",
+    "start": 3.15,
+    "end": 3.32
+   },
+   {
+    "text": "at",
+    "start": 3.32,
+    "end": 3.54
+   },
+   {
+    "text": "exactly",
+    "start": 3.54,
+    "end": 4.12
+   },
+   {
+    "text": "one",
+    "start": 4.12,
+    "end": 4.36
+   },
+   {
+    "text": "hundred",
+    "start": 4.36,
+    "end": 4.8
+   },
+   {
+    "text": "degrees?",
+    "start": 4.8,
+    "end": 5.27
+   }
+  ]
+ },
+ "zoom": {
+  "duration": 2.197,
+  "words": [
+   {
+    "text": "Zoom",
+    "start": 0.04,
+    "end": 0.34
+   },
+   {
+    "text": "in",
+    "start": 0.34,
+    "end": 0.55
+   },
+   {
+    "text": "a",
+    "start": 0.55,
+    "end": 0.67
+   },
+   {
+    "text": "few",
+    "start": 0.67,
+    "end": 0.98
+   },
+   {
+    "text": "hundred",
+    "start": 0.98,
+    "end": 1.36
+   },
+   {
+    "text": "million",
+    "start": 1.36,
+    "end": 1.79
+   },
+   {
+    "text": "times.",
+    "start": 1.79,
+    "end": 2.1
+   }
+  ]
+ },
+ "molecule": {
+  "duration": 4.821,
+  "words": [
+   {
+    "text": "Each",
+    "start": 0.04,
+    "end": 0.25
+   },
+   {
+    "text": "molecule",
+    "start": 0.25,
+    "end": 1.04
+   },
+   {
+    "text": "is",
+    "start": 1.04,
+    "end": 1.34
+   },
+   {
+    "text": "one",
+    "start": 1.34,
+    "end": 1.55
+   },
+   {
+    "text": "oxygen",
+    "start": 1.55,
+    "end": 2.21
+   },
+   {
+    "text": "and",
+    "start": 2.21,
+    "end": 2.3
+   },
+   {
+    "text": "two",
+    "start": 2.3,
+    "end": 2.69
+   },
+   {
+    "text": "hydrogens,",
+    "start": 2.69,
+    "end": 3.2
+   },
+   {
+    "text": "sharing",
+    "start": 3.54,
+    "end": 4.11
+   },
+   {
+    "text": "electrons.",
+    "start": 4.11,
+    "end": 4.74
+   }
+  ]
+ },
+ "charge": {
+  "duration": 7.424,
+  "words": [
+   {
+    "text": "Oxygen",
+    "start": 0.12,
+    "end": 0.72
+   },
+   {
+    "text": "pulls",
+    "start": 0.72,
+    "end": 1.04
+   },
+   {
+    "text": "the",
+    "start": 1.04,
+    "end": 1.28
+   },
+   {
+    "text": "shared",
+    "start": 1.28,
+    "end": 1.56
+   },
+   {
+    "text": "electrons",
+    "start": 1.56,
+    "end": 2.23
+   },
+   {
+    "text": "harder,",
+    "start": 2.23,
+    "end": 2.63
+   },
+   {
+    "text": "so",
+    "start": 3.1,
+    "end": 3.35
+   },
+   {
+    "text": "it",
+    "start": 3.35,
+    "end": 3.46
+   },
+   {
+    "text": "turns",
+    "start": 3.46,
+    "end": 3.73
+   },
+   {
+    "text": "slightly",
+    "start": 3.73,
+    "end": 4.12
+   },
+   {
+    "text": "negative,",
+    "start": 4.12,
+    "end": 4.71
+   },
+   {
+    "text": "and",
+    "start": 5.22,
+    "end": 5.44
+   },
+   {
+    "text": "the",
+    "start": 5.44,
+    "end": 5.7
+   },
+   {
+    "text": "hydrogens",
+    "start": 5.7,
+    "end": 6.24
+   },
+   {
+    "text": "slightly",
+    "start": 6.24,
+    "end": 6.65
+   },
+   {
+    "text": "positive.",
+    "start": 6.65,
+    "end": 7.18
+   }
+  ]
+ },
+ "hbonds": {
+  "duration": 4.075,
+  "words": [
+   {
+    "text": "Opposites",
+    "start": 0.13,
+    "end": 0.7
+   },
+   {
+    "text": "attract.",
+    "start": 0.7,
+    "end": 1.01
+   },
+   {
+    "text": "Neighbors",
+    "start": 1.55,
+    "end": 2.04
+   },
+   {
+    "text": "cling",
+    "start": 2.04,
+    "end": 2.31
+   },
+   {
+    "text": "together",
+    "start": 2.31,
+    "end": 2.82
+   },
+   {
+    "text": "with",
+    "start": 2.82,
+    "end": 3.11
+   },
+   {
+    "text": "hydrogen",
+    "start": 3.11,
+    "end": 3.79
+   },
+   {
+    "text": "bonds.",
+    "start": 3.79,
+    "end": 3.98
+   }
+  ]
+ },
+ "heat": {
+  "duration": 4.117,
+  "words": [
+   {
+    "text": "Heat",
+    "start": 0.08,
+    "end": 0.23
+   },
+   {
+    "text": "makes",
+    "start": 0.23,
+    "end": 0.78
+   },
+   {
+    "text": "them",
+    "start": 0.78,
+    "end": 0.97
+   },
+   {
+    "text": "jiggle",
+    "start": 0.97,
+    "end": 1.24
+   },
+   {
+    "text": "faster",
+    "start": 1.24,
+    "end": 1.79
+   },
+   {
+    "text": "and",
+    "start": 1.79,
+    "end": 1.87
+   },
+   {
+    "text": "faster,",
+    "start": 1.87,
+    "end": 2.36
+   },
+   {
+    "text": "and",
+    "start": 2.72,
+    "end": 2.93
+   },
+   {
+    "text": "the",
+    "start": 2.93,
+    "end": 3.14
+   },
+   {
+    "text": "temperature",
+    "start": 3.14,
+    "end": 3.84
+   },
+   {
+    "text": "climbs.",
+    "start": 3.84,
+    "end": 3.97
+   }
+  ]
+ },
+ "stop": {
+  "duration": 3.904,
+  "words": [
+   {
+    "text": "But",
+    "start": 0.03,
+    "end": 0.21
+   },
+   {
+    "text": "at",
+    "start": 0.21,
+    "end": 0.46
+   },
+   {
+    "text": "one",
+    "start": 0.46,
+    "end": 0.61
+   },
+   {
+    "text": "hundred",
+    "start": 0.61,
+    "end": 0.93
+   },
+   {
+    "text": "degrees,",
+    "start": 0.93,
+    "end": 1.38
+   },
+   {
+    "text": "the",
+    "start": 1.75,
+    "end": 1.94
+   },
+   {
+    "text": "heat",
+    "start": 1.94,
+    "end": 2.26
+   },
+   {
+    "text": "stops",
+    "start": 2.26,
+    "end": 2.48
+   },
+   {
+    "text": "raising",
+    "start": 2.48,
+    "end": 2.88
+   },
+   {
+    "text": "the",
+    "start": 2.88,
+    "end": 2.93
+   },
+   {
+    "text": "temperature.",
+    "start": 2.93,
+    "end": 3.74
+   }
+  ]
+ },
+ "free": {
+  "duration": 4.16,
+  "words": [
+   {
+    "text": "It",
+    "start": 0.02,
+    "end": 0.35
+   },
+   {
+    "text": "goes",
+    "start": 0.35,
+    "end": 0.49
+   },
+   {
+    "text": "into",
+    "start": 0.49,
+    "end": 0.92
+   },
+   {
+    "text": "snapping",
+    "start": 0.92,
+    "end": 1.4
+   },
+   {
+    "text": "hydrogen",
+    "start": 1.4,
+    "end": 2.06
+   },
+   {
+    "text": "bonds,",
+    "start": 2.06,
+    "end": 2.23
+   },
+   {
+    "text": "and",
+    "start": 2.58,
+    "end": 2.79
+   },
+   {
+    "text": "setting",
+    "start": 2.79,
+    "end": 3.15
+   },
+   {
+    "text": "molecules",
+    "start": 3.15,
+    "end": 3.81
+   },
+   {
+    "text": "free.",
+    "start": 3.81,
+    "end": 3.99
+   }
+  ]
+ },
+ "payoff": {
+  "duration": 5.632,
+  "words": [
+   {
+    "text": "Free",
+    "start": 0.05,
+    "end": 0.22
+   },
+   {
+    "text": "molecules",
+    "start": 0.22,
+    "end": 1.14
+   },
+   {
+    "text": "spread",
+    "start": 1.14,
+    "end": 1.32
+   },
+   {
+    "text": "out.",
+    "start": 1.32,
+    "end": 1.54
+   },
+   {
+    "text": "One",
+    "start": 2.12,
+    "end": 2.37
+   },
+   {
+    "text": "cup",
+    "start": 2.37,
+    "end": 2.52
+   },
+   {
+    "text": "of",
+    "start": 2.52,
+    "end": 2.67
+   },
+   {
+    "text": "water",
+    "start": 2.67,
+    "end": 3.18
+   },
+   {
+    "text": "becomes",
+    "start": 3.18,
+    "end": 3.71
+   },
+   {
+    "text": "about",
+    "start": 3.71,
+    "end": 4.09
+   },
+   {
+    "text": "sixteen",
+    "start": 4.09,
+    "end": 4.45
+   },
+   {
+    "text": "hundred",
+    "start": 4.45,
+    "end": 4.83
+   },
+   {
+    "text": "cups",
+    "start": 4.83,
+    "end": 4.92
+   },
+   {
+    "text": "of",
+    "start": 4.92,
+    "end": 5.17
+   },
+   {
+    "text": "steam.",
+    "start": 5.17,
+    "end": 5.43
+   }
+  ]
+ },
+ "claim": {
+  "duration": 3.541,
+  "words": [
+   {
+    "text": "That's",
+    "start": 0.02,
+    "end": 0.21
+   },
+   {
+    "text": "boiling:",
+    "start": 0.21,
+    "end": 0.72
+   },
+   {
+    "text": "heat",
+    "start": 1.22,
+    "end": 1.45
+   },
+   {
+    "text": "that",
+    "start": 1.45,
+    "end": 1.61
+   },
+   {
+    "text": "frees",
+    "start": 1.61,
+    "end": 1.77
+   },
+   {
+    "text": "water",
+    "start": 1.77,
+    "end": 2.26
+   },
+   {
+    "text": "instead",
+    "start": 2.26,
+    "end": 2.61
+   },
+   {
+    "text": "of",
+    "start": 2.61,
+    "end": 2.82
+   },
+   {
+    "text": "warming",
+    "start": 2.82,
+    "end": 3.26
+   },
+   {
+    "text": "it.",
+    "start": 3.26,
+    "end": 3.39
+   }
+  ]
+ }
+}

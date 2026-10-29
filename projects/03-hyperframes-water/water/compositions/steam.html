@@ -1,0 +1,80 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, #121a27 0%, #06080d 72%); overflow: hidden; }
+    #s-cam { position: absolute; inset: 0; transform-origin: 1240px 330px; }
+    #s-cam svg { position: absolute; inset: 0; }
+    .s-title { position: absolute; left: 144px; top: 120px; font-size: 76px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.05; max-width: 900px; }
+    .s-title span { display: inline-block; margin-right: 0.22em; }
+    .s-title .accent { color: #ff9a3c; }
+    #s-eq { position: absolute; left: 148px; top: 330px; font-family: "JetBrains Mono", monospace; font-size: 32px; color: #9fb4c8; letter-spacing: 0.04em; }
+    #s-temp { position: absolute; right: 144px; top: 120px; text-align: right; }
+    #s-temp .k { font-family: "JetBrains Mono", monospace; font-size: 24px; color: #8193a6; letter-spacing: 0.14em; }
+    #s-temp .v { font-size: 88px; font-weight: 900; letter-spacing: -0.03em; color: #ffb070; }
+  </style>
+  <div id="root" data-composition-id="steam" data-width="1920" data-height="1080">
+    <div id="s-cam">
+      <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+        <defs>
+          <linearGradient id="s-wgrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#5cb8e8" stop-opacity="0.8" />
+            <stop offset="1" stop-color="#14507e" stop-opacity="0.95" />
+          </linearGradient>
+          <linearGradient id="s-shine" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#fff" stop-opacity="0.22" />
+            <stop offset="1" stop-color="#fff" stop-opacity="0" />
+          </linearGradient>
+          <filter id="s-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9" /></filter>
+        </defs>
+        <g transform="translate(280 0)">
+        <rect x="-2000" y="840" width="6000" height="600" fill="#0b111a" />
+        <ellipse cx="960" cy="848" rx="300" ry="34" fill="#ff9a3c" opacity="0.1" />
+        <path d="M776 470 L1144 470 L1120 816 L800 816 Z" fill="url(#s-wgrad)" />
+        <ellipse cx="960" cy="470" rx="184" ry="15" fill="#9ad8f7" opacity="0.55" />
+        <g id="s-bubbles" fill="none" stroke="#dff3ff" stroke-width="2"></g>
+        <path d="M750 240 L792 840 L1128 840 L1170 240" fill="none" stroke="#dbe9f3" stroke-width="5" stroke-linejoin="round" />
+        <ellipse cx="960" cy="240" rx="210" ry="20" fill="none" stroke="#dbe9f3" stroke-width="3" opacity="0.7" />
+        <path d="M772 290 L810 290 L840 780 L806 780 Z" fill="url(#s-shine)" />
+        <g id="s-steam" filter="url(#s-blur)" fill="none" stroke="#eef4f8" stroke-linecap="round"></g>
+        </g>
+      </svg>
+    </div>
+    <h1 class="s-title" id="s-title"><span>At</span><span class="accent">100 °C,</span><span>liquid</span><span>water</span><span>becomes</span><span>gas.</span></h1>
+    <div id="s-eq">H₂O (liquid) → H₂O (gas)</div>
+    <div id="s-temp"><div class="k">TEMPERATURE</div><div class="v">100 °C</div></div>
+  </div>
+  <script>
+    (() => {
+      const NS = "http://www.w3.org/2000/svg";
+      function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+      const R = rng(21);
+      const steamG = document.getElementById("s-steam"), bubG = document.getElementById("s-bubbles");
+      const wisps = Array.from({ length: 9 }, (_, i) => { const p = document.createElementNS(NS, "path"); steamG.appendChild(p); return { el: p, x0: 860 + (i % 5) * 50 + R() * 20, per: 2.4 + R() * 1.2, ph: R(), amp: 18 + R() * 20 }; });
+      const bubbles = Array.from({ length: 26 }, () => { const c = document.createElementNS(NS, "circle"); bubG.appendChild(c); return { el: c, x: 820 + R() * 280, per: 0.9 + R() * 1.1, ph: R(), r: 3 + R() * 6 }; });
+      function render(t) {
+        wisps.forEach((w, i) => {
+          const a = (t / w.per + w.ph) % 1, y = 450 - a * 380, x = w.x0 + Math.sin(a * 5 + i) * 20 * a;
+          w.el.setAttribute("d", `M${x} ${y} q ${w.amp} -55 0 -110 q ${-w.amp} -55 0 -110`);
+          w.el.setAttribute("stroke-width", (16 + a * 26).toFixed(1));
+          w.el.setAttribute("opacity", (0.55 * Math.sin(Math.PI * a)).toFixed(3));
+        });
+        bubbles.forEach((b, i) => {
+          const a = (t / b.per + b.ph) % 1;
+          b.el.setAttribute("cx", (b.x + Math.sin(a * 9 + i) * 6).toFixed(1));
+          b.el.setAttribute("cy", (806 - a * 326).toFixed(1));
+          b.el.setAttribute("r", (b.r * (0.6 + a * 0.6)).toFixed(1));
+          b.el.setAttribute("opacity", (0.8 * Math.min(1, (1 - a) * 4)).toFixed(3));
+        });
+      }
+      const tl = gsap.timeline({ paused: true });
+      const clock = { t: 0 };
+      tl.fromTo(clock, { t: 0 }, { t: 5.5, duration: 5.5, ease: "none", onUpdate: () => render(clock.t) }, 0);
+      // the camera pulls back from the steam to the whole glass
+      tl.fromTo("#s-cam", { scale: 3.2, filter: "blur(6px)" }, { scale: 1, filter: "blur(0px)", duration: 1.5, ease: "power2.inOut" }, 0);
+      tl.fromTo("#s-temp", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.3);
+      tl.fromTo("#s-title span", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, stagger: 0.067, ease: "power4.out" }, 1.35);
+      tl.fromTo("#s-eq", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power2.out" }, 2.0);
+      render(0);
+      window.__timelines["steam"] = tl;
+    })();
+  </script>
+</template>
